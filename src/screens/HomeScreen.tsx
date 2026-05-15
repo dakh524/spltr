@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { Bell, Zap, Banknote, PlusCircle } from 'lucide-react-native';
+import { Bell, Zap, PlusCircle } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
 import SplitCard from '../components/SplitCard';
 import AdBanner from '../components/AdBanner';
@@ -43,7 +43,6 @@ const HomeScreen = () => {
     setSplits(data);
     if (savedFriends) setFriends(savedFriends);
 
-    // Calculate metrics
     let totalAmount = 0;
     let pendingAmount = 0;
     let pCount = 0;
@@ -67,12 +66,14 @@ const HomeScreen = () => {
     setPendingCount(pCount);
   };
 
-  const onRefresh = useCallback(() => {
+  // BUG 2 Fix: onRefresh now calls loadData
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    loadData().then(() => setRefreshing(false));
+    await loadData();
+    setRefreshing(false);
   }, []);
 
-  const MetricCard = ({ label, value, color }: any) => (
+  const MetricCard = ({ label, value }: any) => (
     <View style={styles.metricCard}>
       <Text style={styles.metricValue}>{value}</Text>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -99,16 +100,27 @@ const HomeScreen = () => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.neonGreen} />}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={Colors.neonGreen} 
+          />
+        }
       >
-        {/* Summary Metrics */}
         <View style={styles.metricsRow}>
           <MetricCard label="Total Splits" value={metrics.total} />
-          <MetricCard label="Total ₹" value={`₹${metrics.amount > 1000 ? (metrics.amount/1000).toFixed(1)+'k' : metrics.amount}`} />
-          <MetricCard label="Pending" value={`₹${metrics.pending > 1000 ? (metrics.pending/1000).toFixed(1)+'k' : metrics.pending}`} />
+          {/* BUG 3 Fix: Clean formatting with toLocaleString */}
+          <MetricCard 
+            label="Total Amount" 
+            value={`₹${metrics.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} 
+          />
+          <MetricCard 
+            label="Pending" 
+            value={`₹${metrics.pending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} 
+          />
         </View>
 
-        {/* Saved Friends */}
         {friends.length > 0 && (
           <View style={styles.friendsSection}>
             <Text style={styles.subLabel}>Quick Split</Text>
@@ -119,7 +131,7 @@ const HomeScreen = () => {
                   style={styles.friendItem}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate('New Split'); // Could pre-select friend if logic allowed
+                    navigation.navigate('New Split');
                   }}
                 >
                   <FriendAvatar name={friend.name} color={friend.avatarColor} size={50} />
@@ -159,11 +171,9 @@ const HomeScreen = () => {
           ))
         )}
         
-        {/* Extra space for absolute banner */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* AdMob Banner at absolute bottom */}
       <View style={styles.bannerContainer}>
         <AdBanner />
       </View>
@@ -242,14 +252,16 @@ const styles = StyleSheet.create({
   },
   metricValue: {
     color: Colors.white,
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'SpaceGrotesk-Bold',
+    textAlign: 'center',
   },
   metricLabel: {
     color: Colors.muted,
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'SpaceGrotesk-Medium',
     marginTop: 4,
+    textAlign: 'center',
   },
   friendsSection: {
     marginBottom: 24,

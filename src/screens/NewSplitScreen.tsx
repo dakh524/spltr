@@ -12,25 +12,28 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { ArrowLeft, Edit3, Link as LinkIcon, X } from 'lucide-react-native';
+import { ArrowLeft, Edit3, Link as LinkIcon, X, Contact } from 'lucide-react-native';
 import { Colors, AvatarColors } from '../constants/Colors';
 import AmountInput from '../components/AmountInput';
 import FriendSelector from '../components/FriendSelector';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import * as Contacts from 'expo-contacts';
 import { getData, saveData, saveSplit } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
 import { Split, Friend, Category } from '../types';
+import { makeUPILink } from '../utils/upiLink';
 
 const NewSplitScreen = () => {
   const navigation = useNavigation<any>();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<any[]>([]);
   const [allFriends, setAllFriends] = useState<any[]>([]);
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [newFriendName, setNewFriendName] = useState('');
   const [newFriendUPI, setNewFriendUPI] = useState('');
+  const [newFriendPhone, setNewFriendPhone] = useState('');
   const [splitName, setSplitName] = useState('');
   const [category, setCategory] = useState<Category>('other');
 
@@ -44,9 +47,9 @@ const NewSplitScreen = () => {
       setAllFriends(friends);
     } else {
       const defaults = [
-        { id: '1', name: 'Naman Vani', upiId: 'naman@upi', avatarColor: AvatarColors[0] },
-        { id: '2', name: 'Aman Gupta', upiId: 'aman@upi', avatarColor: AvatarColors[1] },
-        { id: '3', name: 'Shubham', upiId: 'shubham@upi', avatarColor: AvatarColors[2] },
+        { id: '1', name: 'Naman Vani', upiId: 'naman@upi', phone: '', avatarColor: AvatarColors[0] },
+        { id: '2', name: 'Aman Gupta', upiId: 'aman@upi', phone: '', avatarColor: AvatarColors[1] },
+        { id: '3', name: 'Shubham', upiId: 'shubham@upi', phone: '', avatarColor: AvatarColors[2] },
       ];
       setAllFriends(defaults);
       await saveData(StorageKeys.FRIENDS, defaults);
@@ -54,102 +57,142 @@ const NewSplitScreen = () => {
   };
 
   const handleToggleFriend = (id: string) => {
+    const friend = allFriends.find(f => f.id === id);
+    if (!friend) return;
+
     setSelectedFriends((prev) =>
-      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
+      prev.some(f => f.id === id) ? prev.filter((f) => f.id !== id) : [...prev, friend]
     );
   };
 
-  const handleAddFriend = async () => {
-    if (!newFriendName) {
-      Alert.alert("Error", "Please enter a name");
-      return;
+  // IMPROVEMENT 1: Contact Picker
+  const pickContact = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status === 'granted') {
+      const contact = await Contacts.presentContactPickerAsync();
+      if (contact) {
+        setNewFriendName(contact.name);
+        const phone = contact.phoneNumbers && contact.phoneNumbers.length > 0 
+          ? contact.phoneNumbers[0].number?.replace(/[^0-9]/g, '') 
+          : '';
+        
+        // Clean phone number (remove +91 if present)
+        const cleanPhone = phone?.startsWith('91') && phone.length > 10 
+          ? phone.substring(2) 
+          : phone;
+        
+        setNewFriendPhone(cleanPhone || '');
+
+        // Auto-fill UPI if previously saved
+        const existingFriend = allFriends.find(f => 
+          f.name === contact.name || (cleanPhone && f.phone === cleanPhone)
+        );
+        if (existingFriend && existingFriend.upiId) {
+          setNewFriendUPI(existingFriend.upiId);
+        } else {
+          setNewFriendUPI('');
+        }
+        
+        setShowAddFriend(true);
+      }
+    } else {
+      Alert.alert("Permission Denied", "We need access to your contacts to pick a friend.");
     }
+  };
+
+  const handleAddFriend = async () => {
+    if (!newFriendName) return;
+    
+    const friendId = Date.now().toString();
     const newFriend = {
-      id: Date.now().toString(),
+      id: friendId,
       name: newFriendName,
       upiId: newFriendUPI || '',
+      phone: newFriendPhone || '',
       avatarColor: AvatarColors[allFriends.length % AvatarColors.length],
     };
-    const updated = [...allFriends, newFriend];
-    setAllFriends(updated);
-    await saveData(StorageKeys.FRIENDS, updated);
+
+    // Update existing or add new
+    let updatedFriends;
+    const existingIndex = allFriends.findIndex(f => 
+      (newFriendPhone && f.phone === newFriendPhone) || (f.name === newFriendName && !f.phone)
+    );
+
+    if (existingIndex !== -1) {
+      updatedFriends = [...allFriends];
+      updatedFriends[existingIndex] = { ...updatedFriends[existingIndex], ...newFriend, id: updatedFriends[existingIndex].id };
+    } else {
+      updatedFriends = [...allFriends, newFriend];
+    }
+
+    setAllFriends(updatedFriends);
+    await saveData(StorageKeys.FRIENDS, updatedFriends);
+    
+    // Automatically select the added friend
+    const finalFriend = existingIndex !== -1 ? updatedFriends[existingIndex] : newFriend;
+    if (!selectedFriends.some(f => f.id === finalFriend.id)) {
+      setSelectedFriends([...selectedFriends, finalFriend]);
+    }
+
     setNewFriendName('');
     setNewFriendUPI('');
+    setNewFriendPhone('');
     setShowAddFriend(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleGenerateLinks = async () => {
-    // 1. Check myUPI exists
+    if (!amount || parseFloat(amount) <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+
+    if (selectedFriends.length === 0) {
+      Alert.alert('Error', 'Please add at least one friend');
+      return;
+    }
+
     const myUPI = await getData(StorageKeys.MY_UPI);
-    if (!myUPI || myUPI.trim() === '') {
+    const myName = await getData(StorageKeys.MY_NAME);
+
+    if (!myUPI) {
       Alert.alert(
-        "Setup Required",
-        "Please set your UPI ID in Settings first",
-        [
-          { text: "Go to Settings", onPress: () => navigation.navigate('Profile') },
-          { text: "Cancel", style: "cancel" }
-        ]
+        'UPI ID Missing',
+        'Please set your UPI ID in Settings first',
+        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }, { text: 'Cancel' }]
       );
       return;
     }
 
-    if (!amount || amount === '0' || !splitName.trim() || selectedFriends.length === 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Incomplete Fields', 'Please enter a valid amount, split name, and select at least one friend.');
-      return;
-    }
+    const totalAmount = parseFloat(amount);
+    const splitAmount = totalAmount / (selectedFriends.length + 1);
+    const splitAmountVal = parseFloat(splitAmount.toFixed(2));
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const friendsWithLinks = selectedFriends.map(friend => ({
+      ...friend,
+      amount: splitAmountVal,
+      paid: false,
+      upiLink: makeUPILink(
+        myUPI,
+        myName || 'Me',
+        splitAmountVal,
+        splitName || note || 'Bill Split'
+      )
+    }));
 
-    try {
-      const total = parseFloat(amount);
-      if (isNaN(total) || total <= 0) {
-        Alert.alert("Invalid Amount", "Please enter a valid total amount.");
-        return;
-      }
+    const newSplit: Split = {
+      id: Date.now().toString(),
+      name: splitName || note || 'Bill Split',
+      category: category || 'other',
+      totalAmount: totalAmount,
+      date: new Date().toISOString(),
+      note: note || '',
+      friends: friendsWithLinks,
+      createdBy: 'Me'
+    };
 
-      // 2. Calculate amount per person (including self)
-      const perPerson = total / (selectedFriends.length + 1);
-
-      const friendsData: Friend[] = selectedFriends.map((id) => {
-        const f = allFriends.find((af) => af.id === id);
-        if (!f) throw new Error("Friend not found");
-        return {
-          id: f.id,
-          name: f.name,
-          upiId: f.upiId || '', // Default to empty string if missing
-          amount: perPerson,
-          paid: false,
-          avatarColor: f.avatarColor,
-        };
-      });
-
-      // 3. Build split object
-      const newSplit: Split = {
-        id: Date.now().toString(),
-        name: splitName,
-        category,
-        totalAmount: total,
-        date: new Date().toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }),
-        friends: friendsData,
-        note: note || splitName,
-        createdBy: 'Me',
-      };
-
-      // 4. Save to AsyncStorage via saveSplit()
-      await saveSplit(newSplit);
-
-      // 5. Navigate to ResultsScreen
-      navigation.navigate('Results', { splitId: newSplit.id });
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to generate split. Please try again.");
-    }
+    await saveSplit(newSplit);
+    navigation.navigate('Results', { split: newSplit });
   };
 
   return (
@@ -181,23 +224,19 @@ const NewSplitScreen = () => {
                 onChangeText={setSplitName}
               />
             </View>
-
-            <View style={[styles.inputContainer, { marginTop: 12 }]}>
-              <Edit3 color={Colors.muted} size={20} style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Add Note (optional)"
-                placeholderTextColor={Colors.muted}
-                value={note}
-                onChangeText={setNote}
-              />
-            </View>
           </View>
 
-          <Text style={styles.label}>Split Between</Text>
+          <View style={styles.friendsHeader}>
+            <Text style={styles.labelSmall}>Split Between</Text>
+            <TouchableOpacity style={styles.contactPickerBtn} onPress={pickContact}>
+              <Contact color={Colors.neonGreen} size={18} style={{ marginRight: 6 }} />
+              <Text style={styles.contactPickerText}>Contacts</Text>
+            </TouchableOpacity>
+          </View>
+          
           <FriendSelector
             friends={allFriends}
-            selectedIds={selectedFriends}
+            selectedIds={selectedFriends.map(f => f.id)}
             onToggle={handleToggleFriend}
             onAddMore={() => setShowAddFriend(true)}
           />
@@ -229,7 +268,14 @@ const NewSplitScreen = () => {
               placeholderTextColor={Colors.muted}
               value={newFriendName}
               onChangeText={setNewFriendName}
-              autoFocus
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Phone Number"
+              placeholderTextColor={Colors.muted}
+              value={newFriendPhone}
+              onChangeText={setNewFriendPhone}
+              keyboardType="phone-pad"
             />
             <TextInput
               style={styles.modalInput}
@@ -242,7 +288,7 @@ const NewSplitScreen = () => {
             />
 
             <TouchableOpacity style={styles.modalButton} onPress={handleAddFriend}>
-              <Text style={styles.modalButtonText}>Add Friend</Text>
+              <Text style={styles.modalButtonText}>Save Friend</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -283,6 +329,34 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
+  },
+  labelSmall: {
+    color: Colors.muted,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Bold',
+    textTransform: 'uppercase',
+  },
+  friendsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 15,
+  },
+  contactPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.neonGreen + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.neonGreen + '30',
+  },
+  contactPickerText: {
+    color: Colors.neonGreen,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Bold',
   },
   inputSection: {
     marginVertical: 20,

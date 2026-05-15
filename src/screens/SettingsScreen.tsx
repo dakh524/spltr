@@ -10,7 +10,7 @@ import {
   Switch,
   Platform,
 } from 'react-native';
-import { ArrowLeft, ChevronRight, Bell, CreditCard, User, Shield, Info } from 'lucide-react-native';
+import { ArrowLeft, Bell, CreditCard, User, Shield, Info } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
 import ProBanner from '../components/ProBanner';
 import { getData, saveData } from '../utils/storage';
@@ -18,7 +18,6 @@ import { StorageKeys } from '../constants/StorageKeys';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 
-// BUG FIX: Moved SettingRow OUTSIDE to prevent focus loss on re-render
 const SettingRow = ({
   icon: Icon,
   label,
@@ -60,23 +59,33 @@ const SettingsScreen = () => {
   const [phone, setPhone] = useState('');
   const [notifications, setNotifications] = useState(true);
 
+  // BUG 5 Fix: Load on screen open
   useEffect(() => {
-    loadProfile();
+    const loadSettings = async () => {
+      const upi = await getData(StorageKeys.MY_UPI);
+      const sName = await getData(StorageKeys.MY_NAME);
+      const sPhone = await getData(StorageKeys.MY_PHONE);
+      if (upi) setUpiId(upi);
+      if (sName) setName(sName);
+      if (sPhone) setPhone(sPhone);
+    };
+    loadSettings();
   }, []);
 
-  const loadProfile = async () => {
-    const sUpi = await getData(StorageKeys.MY_UPI);
-    const sName = await getData(StorageKeys.MY_NAME);
-    const sPhone = await getData(StorageKeys.MY_PHONE);
-    
-    if (sUpi) setUpiId(sUpi);
-    if (sName) setName(sName);
-    if (sPhone) setPhone(sPhone);
+  // BUG 5 Fix: Save immediately on every change
+  const handleSaveUPI = async (value: string) => {
+    setUpiId(value);
+    await saveData(StorageKeys.MY_UPI, value);
   };
 
-  const handleUpdate = async (key: string, value: any) => {
-    await saveData(key, value);
-    // Debounced or throttled feedback could be better, but light haptic is fine
+  const handleSaveName = async (value: string) => {
+    setName(value);
+    await saveData(StorageKeys.MY_NAME, value);
+  };
+
+  const handleSavePhone = async (value: string) => {
+    setPhone(value);
+    await saveData(StorageKeys.MY_PHONE, value);
   };
 
   return (
@@ -97,10 +106,7 @@ const SettingsScreen = () => {
             label="UPI ID"
             isInput
             inputValue={upiId}
-            onInputChange={(text: string) => {
-              setUpiId(text);
-              handleUpdate(StorageKeys.MY_UPI, text);
-            }}
+            onInputChange={handleSaveUPI}
             placeholder="example@upi"
           />
           <SettingRow
@@ -108,10 +114,7 @@ const SettingsScreen = () => {
             label="Profile Name"
             isInput
             inputValue={name}
-            onInputChange={(text: string) => {
-              setName(text);
-              handleUpdate(StorageKeys.MY_NAME, text);
-            }}
+            onInputChange={handleSaveName}
             placeholder="Your Name"
           />
           <SettingRow
@@ -119,10 +122,7 @@ const SettingsScreen = () => {
             label="Phone Number"
             isInput
             inputValue={phone}
-            onInputChange={(text: string) => {
-              setPhone(text);
-              handleUpdate(StorageKeys.MY_PHONE, text);
-            }}
+            onInputChange={handleSavePhone}
             placeholder="+91 XXXXX XXXXX"
           />
         </View>
@@ -167,7 +167,6 @@ const SettingsScreen = () => {
         </View>
 
         <ProBanner />
-
         <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>

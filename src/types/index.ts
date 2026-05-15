@@ -3,6 +3,7 @@ export type Category = 'food' | 'travel' | 'home' | 'entertainment' | 'other';
 export interface Friend {
   id: string;
   name: string;
+  phone?: string;
   upiId: string;
   amount: number;
   paid: boolean;
