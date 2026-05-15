@@ -39,3 +39,14 @@ export interface UserProfile {
   currency: string;
   splitType: string;
 }
+
+export interface FinanceEntry {
+  id: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category: string;
+  note: string;
+  date: string; // ISO string
+  createdAt: string;
+  editedAt?: string;
+}

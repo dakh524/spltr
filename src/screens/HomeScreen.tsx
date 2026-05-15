@@ -9,8 +9,9 @@ import {
   RefreshControl,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
-import { Bell, Zap, PlusCircle } from 'lucide-react-native';
+import { Bell, Zap, PlusCircle, TrendingUp, TrendingDown, DollarSign } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
 import SplitCard from '../components/SplitCard';
 import AdBanner from '../components/AdBanner';
@@ -21,6 +22,8 @@ import { getSplits, getData } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import * as financeStorage from '../utils/financeStorage';
+import { format } from 'date-fns';
 
 const { width } = Dimensions.get('window');
 
@@ -28,7 +31,7 @@ const HomeScreen = () => {
   const [splits, setSplits] = useState<Split[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({ total: 0, amount: 0, pending: 0 });
-  const [financeMetrics, setFinanceMetrics] = useState({ earned: 0, spent: 0, trend: [] as any[] });
+  const [financeMetrics, setFinanceMetrics] = useState({ earned: 0, spent: 0, saved: 0, savingsPercent: 0, trend: [] as any[] });
   const [pendingCount, setPendingCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation<any>();
@@ -44,7 +47,6 @@ const HomeScreen = () => {
     const myName = await getData(StorageKeys.MY_NAME);
     const myUPI = await getData(StorageKeys.MY_UPI);
 
-    // Validate name
     if (!myName || /^[0-9]+$/.test(myName)) {
       if (Platform.OS === 'web') {
         alert('Setup Required: Please go to Settings and enter your real name and UPI ID first.');
@@ -59,7 +61,6 @@ const HomeScreen = () => {
       return;
     }
 
-    // Validate UPI
     if (!myUPI || !myUPI.includes('@')) {
       if (Platform.OS === 'web') {
         alert('UPI ID Missing: Please add your UPI ID in Settings before asking money.');
@@ -104,34 +105,27 @@ const HomeScreen = () => {
     });
     setPendingCount(pCount);
 
-    // Load Finance Data for Sparkline
-    const txData = await getData(StorageKeys.TRANSACTIONS);
-    if (txData) {
-      const now = new Date();
-      const last6 = [];
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const m = d.getMonth();
-        const y = d.getFullYear();
-        const monthTx = txData.filter((t: any) => {
-          const td = new Date(t.date);
-          return td.getMonth() === m && td.getFullYear() === y;
-        });
-        const income = monthTx.filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + curr.amount, 0);
-        const expense = monthTx.filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + curr.amount, 0);
-        last6.push({ x: i, y: income - expense });
-      }
-      const currentMonthTx = txData.filter((t: any) => {
-        const td = new Date(t.date);
-        return td.getMonth() === now.getMonth() && td.getFullYear() === now.getFullYear();
-      });
-      const earned = currentMonthTx.filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + curr.amount, 0);
-      const spent = currentMonthTx.filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + curr.amount, 0);
-      setFinanceMetrics({ earned, spent, trend: last6 });
+    const now = new Date();
+    const currentMonthEntries = await financeStorage.getEntriesByMonth(now.getFullYear(), now.getMonth());
+    const summ = await financeStorage.getSummary(currentMonthEntries);
+    
+    const trend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mEntries = await financeStorage.getEntriesByMonth(d.getFullYear(), d.getMonth());
+      const s = await financeStorage.getSummary(mEntries);
+      trend.push({ x: 5 - i, y: s.saved });
     }
+
+    setFinanceMetrics({ 
+      earned: summ.totalIncome, 
+      spent: summ.totalExpense, 
+      saved: summ.saved,
+      savingsPercent: Math.round(summ.savingsPercent),
+      trend 
+    });
   };
 
-  // BUG 2 Fix: onRefresh now calls loadData
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
@@ -175,7 +169,6 @@ const HomeScreen = () => {
       >
         <View style={styles.metricsRow}>
           <MetricCard label="Total Splits" value={metrics.total} />
-          {/* BUG 3 Fix: Clean formatting with toLocaleString */}
           <MetricCard 
             label="Total Amount" 
             value={`₹${metrics.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} 
@@ -189,25 +182,54 @@ const HomeScreen = () => {
         <TouchableOpacity 
           style={styles.financeCard} 
           onPress={() => navigation.navigate('Finance')}
+          activeOpacity={0.9}
         >
-          <View style={styles.financeInfo}>
-            <Text style={styles.financeLabel}>Finance Summary</Text>
-            <Text style={styles.financeValue}>
-              ₹{(financeMetrics.earned - financeMetrics.spent).toLocaleString()} 
-              <Text style={styles.financeSub}> saved</Text>
-            </Text>
+          <View style={styles.financeHeader}>
+            <View style={styles.financeTitleRow}>
+              <DollarSign color={Colors.neonGreen} size={20} style={{ marginRight: 8 }} />
+              <Text style={styles.financeTitle}>My Finance</Text>
+            </View>
+            <Text style={styles.financeMonth}>{format(new Date(), 'MMMM yyyy')}</Text>
           </View>
-          <View style={styles.sparkline}>
-            <VictoryLine
-              data={financeMetrics.trend.length > 0 ? financeMetrics.trend : [{x:0, y:0}, {x:1, y:0}, {x:2, y:0}]}
-              width={120}
-              height={40}
-              padding={0}
-              style={{
-                data: { stroke: Colors.neonGreen, strokeWidth: 3 }
-              }}
-              interpolation="natural"
-            />
+
+          <View style={styles.financeGrid}>
+            <View style={styles.financeStat}>
+              <Text style={styles.statLabel}>Earned</Text>
+              <View style={styles.statValueRow}>
+                <Text style={styles.statValue}>₹{financeMetrics.earned.toLocaleString()}</Text>
+                <TrendingUp color={Colors.neonGreen} size={14} style={{ marginLeft: 6 }} />
+              </View>
+            </View>
+            <View style={styles.financeStat}>
+              <Text style={styles.statLabel}>Spent</Text>
+              <View style={styles.statValueRow}>
+                <Text style={[styles.statValue, { color: Colors.hotPink }]}>₹{financeMetrics.spent.toLocaleString()}</Text>
+                <TrendingDown color={Colors.hotPink} size={14} style={{ marginLeft: 6 }} />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.savingsRow}>
+            <Text style={styles.savingsLabel}>Saved</Text>
+            <Text style={styles.savingsValue}>₹{financeMetrics.saved.toLocaleString()} ({financeMetrics.savingsPercent}%)</Text>
+          </View>
+
+          <View style={styles.sparklineContainer}>
+            {financeMetrics.trend.length > 0 && (
+              <VictoryLine
+                data={financeMetrics.trend}
+                width={width - 80}
+                height={40}
+                padding={0}
+                style={{
+                  data: { stroke: Colors.neonGreen, strokeWidth: 2 }
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.viewDetailsRow}>
+            <Text style={styles.viewDetailsText}>View Details →</Text>
           </View>
         </TouchableOpacity>
 
@@ -442,37 +464,88 @@ const styles = StyleSheet.create({
   financeCard: {
     backgroundColor: Colors.card,
     borderRadius: 20,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: 20,
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: 24,
   },
-  financeInfo: {
-    flex: 1,
+  financeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  financeLabel: {
-    color: Colors.muted,
-    fontSize: 12,
-    fontFamily: 'SpaceGrotesk-Medium',
-    marginBottom: 4,
-  },
-  financeValue: {
+  financeTitle: {
     color: Colors.white,
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'SpaceGrotesk-Bold',
   },
-  financeSub: {
+  financeMonth: {
     color: Colors.muted,
     fontSize: 14,
-    fontFamily: 'SpaceGrotesk-Regular',
+    fontFamily: 'SpaceGrotesk-Medium',
   },
-  sparkline: {
-    width: 120,
+  financeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  financeGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  financeStat: {
+    flex: 1,
+  },
+  statLabel: {
+    color: Colors.muted,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Bold',
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    color: Colors.neonGreen,
+    fontSize: 20,
+    fontFamily: 'BebasNeue-Regular',
+  },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  savingsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  savingsLabel: {
+    color: Colors.muted,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Medium',
+  },
+  savingsValue: {
+    color: Colors.white,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  sparklineContainer: {
+    marginTop: 15,
     height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewDetailsRow: {
+    marginTop: 16,
+    alignItems: 'flex-end',
+  },
+  viewDetailsText: {
+    color: Colors.neonGreen,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Bold',
   },
 });
 

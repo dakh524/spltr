@@ -13,9 +13,11 @@
     "@expo-google-fonts/space-grotesk": "^0.4.1",
     "@expo/metro-runtime": "~6.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/bottom-tabs": "^7.16.1",
     "@react-navigation/native": "^7.2.4",
     "@react-navigation/native-stack": "^7.15.1",
+    "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-asset": "~12.0.13",
     "expo-blur": "~15.0.8",
@@ -41,7 +43,7 @@
     "react-native-share": "^12.3.1",
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
-    "victory-native": "^36.6.11"
+    "victory-native": "^36.9.2"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
