@@ -9,6 +9,7 @@ import {
   Share,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import { ArrowLeft, MessageCircle, CheckCircle } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
@@ -17,7 +18,7 @@ import StatusPill from '../components/StatusPill';
 import AnimatedAmount from '../components/AnimatedAmount';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { updateSplit, getData } from '../utils/storage';
+import { updateSplit, getData, saveData } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
 import { makeUPILink } from '../utils/upiLink';
 import { formatWhatsAppMessage } from '../utils/shareMessage';
@@ -97,14 +98,19 @@ const ResultsScreen = () => {
         ? `https://wa.me/91${phoneNumber}?text=${encodedMessage}`
         : `https://wa.me/?text=${encodedMessage}`;
 
-      // Open directly without canOpenURL check (more reliable)
-      await Linking.openURL(waURL).catch(async () => {
-        // Fallback to native share sheet if openURL fails
-        await Share.share({ 
-          message,
-          title: 'Split Request' 
+      // On Web, window.open is more reliable for direct links
+      if (Platform.OS === 'web') {
+        window.open(waURL, '_blank');
+      } else {
+        // Open directly without canOpenURL check (more reliable)
+        await Linking.openURL(waURL).catch(async () => {
+          // Fallback to native share sheet if openURL fails
+          await Share.share({ 
+            message,
+            title: 'Split Request' 
+          });
         });
-      });
+      }
     } catch (error) {
       console.error('[WhatsAppShare] Error:', error);
       await Share.share({ message });
