@@ -78,7 +78,7 @@ const ResultsScreen = () => {
       const asset = Asset.fromModule(require('../../assets/ask_money.png'));
       await asset.downloadAsync();
 
-      const destPath = FileSystem.cacheDirectory + 'splitr_ask_money.png';
+      const destPath = (FileSystem as any).cacheDirectory + 'splitr_ask_money.png';
       await FileSystem.copyAsync({
         from: asset.localUri || asset.uri || '',
         to: destPath
