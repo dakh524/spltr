@@ -86,16 +86,16 @@ const ResultsScreen = () => {
     try {
       // Step 2: Build payment request message
       const message =
-        `Hey ${friend.name}! 👋\n\n` +
-        `*${myName}* paid for *${split.name}* 🧾\n` +
+        `Hey ${friend.name}!\n\n` +
+        `*${myName}* paid for *${split.name}*\n` +
         `Your share: *₹${friend.amount.toFixed(2)}*\n\n` +
-        `💳 Pay me on any UPI app:\n` +
+        `Pay me on any UPI app:\n` +
         `*UPI ID: ${myUPI}*\n\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `Join SPLITR with this image ⚡\n` +
+        `Join SPLITR with this image\n` +
         `Kindly pay at your earliest convenience.\n` +
-        `Thank you! 🙏\n\n` +
-        `_Regards, SPLITR Team ⚡_`;
+        `Thank you!\n\n` +
+        `_Regards, SPLITR Team_`;
 
       if (Platform.OS === 'web') {
         // Web: Open WhatsApp immediately to avoid popup blocker
