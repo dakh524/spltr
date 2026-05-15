@@ -92,6 +92,7 @@ const ResultsScreen = () => {
         `💳 Pay me on any UPI app:\n` +
         `*UPI ID: ${myUPI}*\n\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
+        `Join SPLITR with this image ⚡\n` +
         `Kindly pay at your earliest convenience.\n` +
         `Thank you! 🙏\n\n` +
         `_Regards, SPLITR Team ⚡_`;
