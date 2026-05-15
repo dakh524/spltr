@@ -84,16 +84,6 @@ const ResultsScreen = () => {
     }
 
     try {
-      // Step 1: Load static branded image from assets
-      const asset = Asset.fromModule(require('../../assets/ask_money.png'));
-      await asset.downloadAsync();
-
-      const destPath = (FileSystem as any).cacheDirectory + 'splitr_ask_money.png';
-      await FileSystem.copyAsync({
-        from: asset.localUri || asset.uri || '',
-        to: destPath
-      });
-
       // Step 2: Build payment request message
       const message =
         `Hey ${friend.name}! 👋\n\n` +
@@ -106,31 +96,53 @@ const ResultsScreen = () => {
         `Thank you! 🙏\n\n` +
         `_Regards, SPLITR Team ⚡_`;
 
+      if (Platform.OS === 'web') {
+        // Web: Open WhatsApp immediately to avoid popup blocker
+        const phone = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+        const whatsappURL = phone 
+          ? `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`
+          : `https://wa.me/?text=${encodeURIComponent(message)}`;
+        
+        window.open(whatsappURL, '_blank');
+        return;
+      }
+
+      // Native: Premium Image Sharing Flow
+      const asset = Asset.fromModule(require('../../assets/ask_money.png'));
+      await asset.downloadAsync();
+
+      const destPath = (FileSystem as any).cacheDirectory + 'splitr_ask_money.png';
+      await FileSystem.copyAsync({
+        from: asset.localUri || asset.uri || '',
+        to: destPath
+      });
+
       // Step 3: Share branded image via native share sheet
       await Sharing.shareAsync(destPath, {
         mimeType: 'image/png',
         dialogTitle: `Ask money from ${friend.name}`,
       });
 
-      // Step 4: Open WhatsApp with text after 1.5 seconds
+      // Step 4: Open WhatsApp with text after a short delay on Native
       setTimeout(async () => {
-        const whatsappURL = friend.phone
-          ? `whatsapp://send?phone=91${friend.phone}&text=${encodeURIComponent(message)}`
+        const phone = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+        const whatsappURL = phone
+          ? `whatsapp://send?phone=91${phone}&text=${encodeURIComponent(message)}`
           : `whatsapp://send?text=${encodeURIComponent(message)}`;
 
         const canOpen = await Linking.canOpenURL(whatsappURL);
         if (canOpen) {
           await Linking.openURL(whatsappURL);
         } else {
-          // Fallback: native share with just text
-          // (Since we already shared the image, we can just let them share text separately if needed,
-          // but usually Sharing.shareAsync triggers a sheet anyway)
-          console.log('WhatsApp not available');
+          // Fallback: share text sheet
+          Sharing.shareAsync(destPath, { dialogTitle: 'Share request text' });
         }
-      }, 1500);
+      }, 1000);
 
     } catch (error) {
-      Alert.alert('Error', 'Could not share payment request. Try again.');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Could not share payment request. Try again.');
+      }
       console.error('Ask Money error:', error);
     }
   };
