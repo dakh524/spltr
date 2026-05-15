@@ -61,6 +61,8 @@ const ResultsScreen = () => {
     const myUPI = await getData(StorageKeys.MY_UPI);
     const myName = await getData(StorageKeys.MY_NAME) || 'Me';
     
+    console.log('[WhatsAppShare] Storage Data - myUPI:', myUPI, 'myName:', myName);
+
     if (!myUPI) {
       Alert.alert('Error', 'Set your UPI ID in settings first');
       return;

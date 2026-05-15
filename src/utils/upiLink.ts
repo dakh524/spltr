@@ -1,5 +1,10 @@
 /**
- * BUG 3 Fix: Generate proper UPI deep links
+ * Generate proper UPI deep links for payment apps.
+ * pa = Address (UPI ID)
+ * pn = Name
+ * am = Amount
+ * cu = Currency
+ * tn = Note
  */
 export function makeUPILink(
   payeeUPI: string,
@@ -7,12 +12,23 @@ export function makeUPILink(
   amount: number,
   note: string
 ): string {
-  const encodedName = encodeURIComponent(payeeName);
-  const encodedNote = encodeURIComponent(note);
+  // Ensure we have strings and no "undefined" literals
+  const upi = payeeUPI || '';
+  const name = payeeName || 'Me';
+  const upiNote = note || 'Bill Split';
+  
+  // pa (Address) should NOT be encoded
+  // pn (Name) and tn (Note) MUST be encoded
+  const encodedName = encodeURIComponent(name);
+  const encodedNote = encodeURIComponent(upiNote);
   const formattedAmount = amount.toFixed(2);
   
-  return `upi://pay?pa=${payeeUPI}&pn=${encodedName}&am=${formattedAmount}&cu=INR&tn=${encodedNote}`;
+  const link = `upi://pay?pa=${upi}&pn=${encodedName}&am=${formattedAmount}&cu=INR&tn=${encodedNote}`;
+  
+  console.log('[UPILink] Generated Link:', link);
+  console.log('[UPILink] Params - pa:', upi, 'pn:', name);
+  
+  return link;
 }
 
-// Deprecated old function for compatibility during migration if needed
 export const generateUPILink = makeUPILink;
