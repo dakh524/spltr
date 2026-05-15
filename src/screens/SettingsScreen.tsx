@@ -9,6 +9,7 @@ import {
   TextInput,
   Switch,
   Platform,
+  Image,
 } from 'react-native';
 import { ArrowLeft, Bell, CreditCard, User, Shield, Info, Users, Plus, Edit2, Trash2, X } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
@@ -251,6 +252,16 @@ const SettingsScreen = () => {
         <View style={{ width: 40 }} />
       </View>
 
+      <View style={styles.brandingSection}>
+        <Image 
+          source={require('../../assets/logo.png')} 
+          style={styles.brandingLogo} 
+          resizeMode="contain"
+        />
+        <Text style={styles.brandingText}>SPLITR Premium</Text>
+        <Text style={styles.brandingVersion}>v1.0.0</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.section}>
@@ -439,6 +450,32 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 20,
     fontFamily: 'SpaceGrotesk-Bold',
+  },
+  brandingSection: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: '#0f0f1a',
+    marginHorizontal: 20,
+    borderRadius: 25,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#1a1a2e',
+  },
+  brandingLogo: {
+    width: 60,
+    height: 60,
+    marginBottom: 12,
+  },
+  brandingText: {
+    color: Colors.neonGreen,
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  brandingVersion: {
+    color: Colors.muted,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Medium',
+    marginTop: 4,
   },
   content: {
     paddingHorizontal: 20,
