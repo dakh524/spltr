@@ -20,17 +20,27 @@ import * as Haptics from 'expo-haptics';
 import { updateSplit, getData } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
 import { makeUPILink } from '../utils/upiLink';
+import { formatWhatsAppMessage } from '../utils/shareMessage';
 
 const ResultsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  
+  // READ THE SPLIT FROM PARAMS
   const { split } = route.params;
+  
   const [currentSplit, setCurrentSplit] = useState(split);
 
   if (!split) {
     return (
       <View style={{ flex: 1, backgroundColor: '#080810', alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ color: 'white', fontFamily: 'SpaceGrotesk-Bold', fontSize: 18 }}>No split data found.</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={{ marginTop: 20, padding: 12, backgroundColor: Colors.card, borderRadius: 12 }}
+        >
+          <Text style={{ color: Colors.neonGreen }}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -47,7 +57,6 @@ const ResultsScreen = () => {
     await updateSplit(currentSplit.id, updated);
   };
 
-  // IMPROVEMENT 2: Individual WhatsApp Share
   const sendWhatsAppRequest = async (friend: any) => {
     const myUPI = await getData(StorageKeys.MY_UPI);
     const myName = await getData(StorageKeys.MY_NAME) || 'Me';
@@ -57,15 +66,14 @@ const ResultsScreen = () => {
       return;
     }
 
-    const upiLink = makeUPILink(myUPI, myName, friend.amount, currentSplit.name);
-
-    const message = 
-      `Hey ${friend.name}! 👋\n` +
-      `${myName} paid for *${currentSplit.name}* 🧾\n` +
-      `Your share: *₹${friend.amount.toFixed(2)}*\n\n` +
-      `Tap to pay instantly 👇\n` +
-      `${upiLink}\n\n` +
-      `_Sent via SPLITR ⚡_`;
+    // BUG 1 & 2 Fix: Use centralized formatWhatsAppMessage utility
+    const message = formatWhatsAppMessage(
+      friend.name,
+      friend.amount,
+      currentSplit.name,
+      myUPI,
+      myName
+    );
 
     let whatsappURL = `whatsapp://send?text=${encodeURIComponent(message)}`;
     
@@ -79,7 +87,6 @@ const ResultsScreen = () => {
       if (supported) {
         await Linking.openURL(whatsappURL);
       } else {
-        // Fallback to generic share
         await Share.share({ message });
       }
     } catch (error) {
