@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   RefreshControl,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Bell, Zap, PlusCircle } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
@@ -34,9 +35,21 @@ const HomeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      checkFirstLaunch();
       loadData();
     }, [])
   );
+
+  const checkFirstLaunch = async () => {
+    const name = await getData(StorageKeys.MY_NAME);
+    if (!name) {
+      Alert.alert(
+        'Welcome to SPLITR! ⚡',
+        'Before you start, please set your name and UPI ID in Settings.',
+        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+      );
+    }
+  };
 
   const loadData = async () => {
     const data = await getSplits();
@@ -199,7 +212,9 @@ const HomeScreen = () => {
 
         {splits.length === 0 ? (
           <View style={styles.emptyState}>
-            <Zap color={Colors.neonGreen} size={64} strokeWidth={1.5} />
+            <View style={styles.emptyLogoContainer}>
+              <Zap color={Colors.neonGreen} size={80} fill={Colors.neonGreen} />
+            </View>
             <Text style={styles.emptyTitle}>No splits yet</Text>
             <Text style={styles.emptySubtitle}>Split your first bill in seconds</Text>
             
@@ -210,8 +225,8 @@ const HomeScreen = () => {
                 navigation.navigate('New Split');
               }}
             >
-              <PlusCircle color={Colors.neonGreen} size={20} style={{ marginRight: 10 }} />
-              <Text style={styles.emptyButtonText}>Start New Split</Text>
+              <PlusCircle color={Colors.background} size={20} style={{ marginRight: 10 }} />
+              <Text style={styles.emptyButtonText}>Start your first split →</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -372,19 +387,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 60,
     borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.neonGreen,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.neonGreen,
     shadowColor: Colors.neonGreen,
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,
   },
   emptyButtonText: {
-    color: Colors.neonGreen,
+    color: Colors.background,
     fontSize: 16,
     fontFamily: 'SpaceGrotesk-Bold',
+  },
+  emptyLogoContainer: {
+    padding: 20,
+    backgroundColor: '#0f0f1a',
+    borderRadius: 40,
+    marginBottom: 10,
   },
   bannerContainer: {
     position: 'absolute',

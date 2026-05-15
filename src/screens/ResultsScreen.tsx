@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,237 +6,238 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Share,
   Alert,
   Linking,
   Platform,
+  Dimensions,
 } from 'react-native';
-import { ArrowLeft, MessageCircle, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle, DollarSign, Clock, Check } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
-import FriendAvatar from '../components/FriendAvatar';
-import StatusPill from '../components/StatusPill';
-import AnimatedAmount from '../components/AnimatedAmount';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { updateSplit, getData, saveData } from '../utils/storage';
-import { StorageKeys } from '../constants/StorageKeys';
-import { formatWhatsAppMessage } from '../utils/shareMessage';
-import QRCode from 'react-native-qrcode-svg';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import ProgressBar from '../components/ProgressBar';
+import { Split, Friend } from '../types';
+
+const { width } = Dimensions.get('window');
 
 const ResultsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const initialSplit = route.params?.split;
   
-  // READ THE SPLIT FROM PARAMS
-  const { split } = route.params;
-  
-  const [currentSplit, setCurrentSplit] = useState(split);
-  const qrRef = useRef<any>(null);
-  const [myUPI, setMyUPI] = useState('');
-  
-  useEffect(() => {
-    loadMyUPI();
-  }, []);
-
-  const loadMyUPI = async () => {
-    const upi = await AsyncStorage.getItem(StorageKeys.MY_UPI);
-    if (upi) setMyUPI(upi.trim());
-  };
+  const [split, setSplit] = useState<Split>(initialSplit);
 
   if (!split) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#080810', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: 'white', fontFamily: 'SpaceGrotesk-Bold', fontSize: 18 }}>No split data found.</Text>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={{ marginTop: 20, padding: 12, backgroundColor: Colors.card, borderRadius: 12 }}
-        >
-          <Text style={{ color: Colors.neonGreen }}>Go Back</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No split data found.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.errorButton}>
+          <Text style={styles.errorButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const markAsPaid = async (friendId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const updated = {
-      ...currentSplit,
-      friends: currentSplit.friends.map((f: any) =>
-        f.id === friendId ? { ...f, paid: !f.paid } : f
-      )
-    };
-    setCurrentSplit(updated);
-    await updateSplit(currentSplit.id, updated);
-  };
+  const paidCount = split.friends.filter(f => f.paid).length;
+  const totalFriends = split.friends.length;
+  const progress = paidCount / totalFriends;
 
-  const sendWhatsAppRequest = async (friend: any) => {
-    // STEP 4: Load fresh and strip quotes
-    const rawName = await AsyncStorage.getItem(StorageKeys.MY_NAME);
-    const rawUPI = await AsyncStorage.getItem(StorageKeys.MY_UPI);
-    
-    const myName = rawName?.replace(/"/g, '').trim() || '';
-    const myUPI = rawUPI?.replace(/"/g, '').trim() || '';
-    
-    console.log('DEBUG myUPI:', myUPI);
-    console.log('DEBUG myName:', myName);
+  const handleAskMoney = async (friend: Friend) => {
+    // Load user details
+    const myName = (await AsyncStorage.getItem('@splitr_myname'))
+      ?.replace(/"/g, '').trim() || '';
+    const myUPI = (await AsyncStorage.getItem('@splitr_myupi'))
+      ?.replace(/"/g, '').trim() || '';
 
-    // Validate Name (prevent phone number as name)
-    if (!myName || /^[0-9]{10}$/.test(myName.replace(/\s/g, ''))) {
-      Alert.alert('Fix Required', 'Please go to Settings and enter your actual name correctly (not your phone number).');
+    // Validate name
+    if (!myName || /^[0-9]+$/.test(myName)) {
+      Alert.alert(
+        'Setup Required',
+        'Please go to Settings and enter your real name and UPI ID first.',
+        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+      );
       return;
     }
 
-    if (!myUPI) {
-      Alert.alert('Setup Required', 'Please set your UPI ID in Settings first.');
-      return;
-    }
-
-    const message = formatWhatsAppMessage(
-      friend.name,
-      myName,
-      myUPI,
-      friend.amount,
-      currentSplit.name
-    );
-
-    // CRITICAL FIX: On Web, open WhatsApp IMMEDIATELY to avoid popup blockers
-    if (Platform.OS === 'web') {
-      const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
-      const waURL = phoneNumber 
-        ? `https://wa.me/91${phoneNumber}?text=${encodeURIComponent(message)}`
-        : `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(waURL, '_blank');
+    // Validate UPI
+    if (!myUPI || !myUPI.includes('@')) {
+      Alert.alert(
+        'UPI ID Missing',
+        'Please add your UPI ID in Settings before asking money.',
+        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+      );
       return;
     }
 
     try {
-      // 1. Generate QR Code Image (Only on Native - FileSystem/Sharing don't work the same on Web)
-      if (qrRef.current) {
-        qrRef.current.toDataURL(async (base64Data: string) => {
-          try {
-            const path = FileSystem.cacheDirectory + 'splitr_qr.png';
-            await FileSystem.writeAsStringAsync(path, base64Data, {
-              encoding: FileSystem.EncodingType.Base64
-            });
+      // Step 1: Load static branded image from assets
+      const asset = Asset.fromModule(require('../../assets/ask_money.png'));
+      await asset.downloadAsync();
 
-            // 2. Share Image
-            // We don't await this so it doesn't block the WhatsApp opening
-            Sharing.shareAsync(path, {
-              mimeType: 'image/png',
-              dialogTitle: 'Send Payment Request'
-            });
-
-            // 3. Open WhatsApp for the text part
-            await shareTextOnly(message, friend);
-          } catch (e) {
-            console.error('QR Share Error:', e);
-            // Fallback to text only
-            await shareTextOnly(message, friend);
-          }
-        });
-      } else {
-        await shareTextOnly(message, friend);
-      }
-    } catch (error) {
-      console.error('[WhatsAppShare] Error:', error);
-      await shareTextOnly(message, friend);
-    }
-  };
-
-  const shareTextOnly = async (message: string, friend: any) => {
-    const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
-    const encodedMessage = encodeURIComponent(message);
-    
-    const waURL = phoneNumber 
-      ? `https://wa.me/91${phoneNumber}?text=${encodedMessage}`
-      : `https://wa.me/?text=${encodedMessage}`;
-
-    if (Platform.OS === 'web') {
-      window.open(waURL, '_blank');
-    } else {
-      await Linking.openURL(waURL).catch(async () => {
-        await Share.share({ message });
+      const destPath = FileSystem.cacheDirectory + 'splitr_ask_money.png';
+      await FileSystem.copyAsync({
+        from: asset.localUri || asset.uri || '',
+        to: destPath
       });
+
+      // Step 2: Build payment request message
+      const message =
+        `Hey ${friend.name}! 👋\n\n` +
+        `*${myName}* paid for *${split.name}* 🧾\n` +
+        `Your share: *₹${friend.amount.toFixed(2)}*\n\n` +
+        `💳 Pay me on any UPI app:\n` +
+        `*UPI ID: ${myUPI}*\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `Kindly pay at your earliest convenience.\n` +
+        `Thank you! 🙏\n\n` +
+        `_Regards, SPLITR Team ⚡_`;
+
+      // Step 3: Share branded image via native share sheet
+      await Sharing.shareAsync(destPath, {
+        mimeType: 'image/png',
+        dialogTitle: `Ask money from ${friend.name}`,
+      });
+
+      // Step 4: Open WhatsApp with text after 1.5 seconds
+      setTimeout(async () => {
+        const whatsappURL = friend.phone
+          ? `whatsapp://send?phone=91${friend.phone}&text=${encodeURIComponent(message)}`
+          : `whatsapp://send?text=${encodeURIComponent(message)}`;
+
+        const canOpen = await Linking.canOpenURL(whatsappURL);
+        if (canOpen) {
+          await Linking.openURL(whatsappURL);
+        } else {
+          // Fallback: native share with just text
+          // (Since we already shared the image, we can just let them share text separately if needed,
+          // but usually Sharing.shareAsync triggers a sheet anyway)
+          console.log('WhatsApp not available');
+        }
+      }, 1500);
+
+    } catch (error) {
+      Alert.alert('Error', 'Could not share payment request. Try again.');
+      console.error('Ask Money error:', error);
     }
   };
 
+  const handleMarkPaid = async (friendId: string) => {
+    // Update friend paid status in the split
+    const updatedFriends = split.friends.map(f =>
+      f.id === friendId ? { ...f, paid: true } : f
+    );
+
+    const updatedSplit = { ...split, friends: updatedFriends };
+
+    // Save updated split to AsyncStorage history
+    const raw = await AsyncStorage.getItem('@splitr_history');
+    const history: Split[] = raw ? JSON.parse(raw) : [];
+    const updatedHistory = history.map(s =>
+      s.id === split.id ? updatedSplit : s
+    );
+    await AsyncStorage.setItem('@splitr_history', JSON.stringify(updatedHistory));
+
+    // Update local state so card turns green immediately
+    setSplit(updatedSplit);
+
+    // Haptic feedback
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={{ position: 'absolute', opacity: 0, left: -1000 }}>
-        {myUPI ? (
-          <QRCode
-            value={`upi://pay?pa=${myUPI}&cu=INR`}
-            size={200}
-            getRef={(ref) => (qrRef.current = ref)}
-          />
-        ) : null}
-      </View>
-
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft color={Colors.white} size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Split Details</Text>
+        <Text style={styles.headerTitle}>Split Results</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.splitInfoCard}>
-          <View>
-            <Text style={styles.splitName}>{currentSplit.name}</Text>
-            <Text style={styles.splitDate}>
-              {new Date(currentSplit.date).toLocaleDateString('en-IN', {
-                day: '2-digit', month: 'short', year: 'numeric'
-              })}
-            </Text>
+        {/* Top Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryHeader}>
+            <View>
+              <Text style={styles.summaryName}>{split.name}</Text>
+              <Text style={styles.summaryDate}>
+                {new Date(split.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </Text>
+            </View>
+            <View style={styles.summaryAmountContainer}>
+              <Text style={styles.summaryAmountLabel}>Total</Text>
+              <Text style={styles.summaryAmount}>₹{split.totalAmount.toLocaleString()}</Text>
+            </View>
           </View>
-          <View style={styles.amountBadge}>
-            <Text style={styles.totalAmountLabel}>Total</Text>
-            <AnimatedAmount amount={currentSplit.totalAmount} style={styles.totalAmountValue} />
+          
+          <View style={styles.progressContainer}>
+            <View style={styles.progressLabelRow}>
+              <Text style={styles.progressText}>
+                {paidCount} of {totalFriends} friends paid
+              </Text>
+              <Text style={styles.progressPercentage}>{Math.round(progress * 100)}%</Text>
+            </View>
+            <ProgressBar progress={progress} color={progress === 1 ? Colors.neonGreen : Colors.amber} />
           </View>
         </View>
 
-        <View style={styles.peopleHeader}>
-          <Text style={styles.peopleTitle}>Split between {currentSplit.friends.length + 1} people</Text>
-          <Text style={styles.perPersonText}>₹{(currentSplit.totalAmount / (currentSplit.friends.length + 1)).toFixed(2)} each</Text>
-        </View>
+        <Text style={styles.sectionTitle}>Friend Settlements</Text>
 
-        {currentSplit.friends.map((friend: any) => {
+        {split.friends.map((friend) => {
           const isPaid = friend.paid;
           return (
             <View 
               key={friend.id} 
-              style={[styles.friendCard, isPaid && styles.paidCard]}
+              style={[
+                styles.friendCard, 
+                isPaid ? styles.paidCard : styles.unpaidCard
+              ]}
             >
-              <View style={styles.friendTopRow}>
-                <FriendAvatar name={friend.name} color={friend.avatarColor} size={48} />
-                <View style={styles.friendInfo}>
-                  <Text style={[styles.friendName, isPaid && styles.paidText]}>{friend.name}</Text>
-                  <Text style={[styles.friendAmount, isPaid && styles.paidTextMuted]}>₹{friend.amount.toFixed(2)}</Text>
+              <View style={styles.friendHeader}>
+                <View style={styles.nameRow}>
+                  <View style={[styles.statusDot, { backgroundColor: isPaid ? Colors.neonGreen : Colors.hotPink }]} />
+                  <Text style={styles.friendName}>{friend.name}</Text>
                 </View>
-                <StatusPill status={isPaid ? 'Paid' : 'Pending'} />
+                <View style={[styles.statusPill, { backgroundColor: isPaid ? '#0f2a0f' : '#2a0f0f' }]}>
+                  {isPaid ? (
+                    <Check color={Colors.neonGreen} size={12} style={{ marginRight: 4 }} />
+                  ) : (
+                    <Clock color={Colors.amber} size={12} style={{ marginRight: 4 }} />
+                  )}
+                  <Text style={[styles.statusText, { color: isPaid ? Colors.neonGreen : Colors.amber }]}>
+                    {isPaid ? 'Paid' : 'Pending'}
+                  </Text>
+                </View>
               </View>
 
-              {!isPaid && (
+              <Text style={[styles.friendAmount, { color: isPaid ? Colors.neonGreen : Colors.hotPink }]}>
+                ₹{friend.amount.toFixed(2)}
+              </Text>
+
+              {isPaid ? (
+                <View style={styles.paidFooter}>
+                  <Text style={styles.paidFooterText}>Payment received 🎉</Text>
+                </View>
+              ) : (
                 <View style={styles.actionRow}>
                   <TouchableOpacity 
-                    style={styles.sendBtn} 
-                    onPress={() => sendWhatsAppRequest(friend)}
+                    style={styles.askButton} 
+                    onPress={() => handleAskMoney(friend)}
                   >
-                    <MessageCircle color={Colors.white} size={18} style={{ marginRight: 6 }} />
-                    <Text style={styles.sendBtnText}>Send Request</Text>
+                    <DollarSign color={Colors.background} size={18} style={{ marginRight: 6 }} />
+                    <Text style={styles.askButtonText}>Ask Money</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    style={styles.paidBtn} 
-                    onPress={() => markAsPaid(friend.id)}
+                    style={styles.markPaidButton} 
+                    onPress={() => handleMarkPaid(friend.id)}
                   >
                     <CheckCircle color={Colors.neonGreen} size={18} style={{ marginRight: 6 }} />
-                    <Text style={styles.paidBtnText}>Mark Paid</Text>
+                    <Text style={styles.markPaidButtonText}>Mark Paid</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -275,126 +276,189 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
   },
-  splitInfoCard: {
+  summaryCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 10,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  splitName: {
+  summaryName: {
     color: Colors.white,
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'SpaceGrotesk-Bold',
   },
-  splitDate: {
+  summaryDate: {
     color: Colors.muted,
     fontSize: 14,
     fontFamily: 'SpaceGrotesk-Regular',
     marginTop: 4,
   },
-  amountBadge: {
+  summaryAmountContainer: {
     alignItems: 'flex-end',
   },
-  totalAmountLabel: {
+  summaryAmountLabel: {
     color: Colors.muted,
     fontSize: 12,
     fontFamily: 'SpaceGrotesk-Medium',
   },
-  totalAmountValue: {
-    color: Colors.neonGreen,
-    fontSize: 28,
+  summaryAmount: {
+    color: Colors.white,
+    fontSize: 24,
     fontFamily: 'BebasNeue-Regular',
   },
-  peopleHeader: {
+  progressContainer: {
+    marginTop: 10,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressText: {
+    color: Colors.muted,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Medium',
+  },
+  progressPercentage: {
+    color: Colors.white,
+    fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  sectionTitle: {
+    color: Colors.white,
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk-Bold',
+    marginBottom: 16,
+  },
+  friendCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 0.5,
+    borderLeftWidth: 4,
+  },
+  unpaidCard: {
+    backgroundColor: '#0f0f1a',
+    borderColor: '#1a1a2e',
+    borderLeftColor: Colors.hotPink,
+  },
+  paidCard: {
+    backgroundColor: '#0a1f0a',
+    borderColor: '#1a3a1a',
+    borderLeftColor: Colors.neonGreen,
+  },
+  friendHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  peopleTitle: {
-    color: Colors.white,
-    fontSize: 16,
-    fontFamily: 'SpaceGrotesk-Bold',
-  },
-  perPersonText: {
-    color: Colors.muted,
-    fontSize: 14,
-    fontFamily: 'SpaceGrotesk-Medium',
-  },
-  friendCard: {
-    backgroundColor: Colors.card,
-    padding: 16,
-    borderRadius: 24,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  paidCard: {
-    borderColor: Colors.neonGreen,
-    backgroundColor: Colors.neonGreen + '10',
-  },
-  friendTopRow: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  friendInfo: {
-    flex: 1,
-    marginLeft: 16,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   friendName: {
     color: Colors.white,
     fontSize: 16,
     fontFamily: 'SpaceGrotesk-Bold',
   },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: 'SpaceGrotesk-Bold',
+    textTransform: 'uppercase',
+  },
   friendAmount: {
-    color: Colors.muted,
-    fontSize: 14,
-    fontFamily: 'SpaceGrotesk-Medium',
-    marginTop: 2,
-  },
-  paidText: {
-    color: Colors.neonGreen,
-  },
-  paidTextMuted: {
-    color: Colors.neonGreen + '80',
+    fontSize: 32,
+    fontFamily: 'BebasNeue-Regular',
+    marginBottom: 12,
   },
   actionRow: {
     flexDirection: 'row',
-    marginTop: 16,
     justifyContent: 'space-between',
   },
-  sendBtn: {
-    flex: 1.2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.hotPink,
-    paddingVertical: 12,
-    borderRadius: 14,
-    marginRight: 8,
-  },
-  sendBtnText: {
-    color: Colors.white,
-    fontSize: 13,
-    fontFamily: 'SpaceGrotesk-Bold',
-  },
-  paidBtn: {
+  askButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
+    backgroundColor: Colors.neonGreen,
+    height: 48,
+    borderRadius: 10,
+    marginRight: 8,
+  },
+  askButtonText: {
+    color: Colors.background,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  markPaidButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0f2a0f',
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
     borderColor: Colors.neonGreen,
   },
-  paidBtnText: {
+  markPaidButtonText: {
+    color: Colors.neonGreen,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  paidFooter: {
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  paidFooterText: {
     color: Colors.neonGreen,
     fontSize: 13,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: Colors.white,
+    fontSize: 18,
+    fontFamily: 'SpaceGrotesk-Bold',
+    marginBottom: 20,
+  },
+  errorButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    color: Colors.neonGreen,
     fontFamily: 'SpaceGrotesk-Bold',
   },
 });

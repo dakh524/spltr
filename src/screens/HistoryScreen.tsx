@@ -90,7 +90,7 @@ const HistoryScreen = () => {
       >
         {filteredSplits.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No history found</Text>
+            <Text style={styles.emptyText}>No history yet</Text>
           </View>
         ) : (
           filteredSplits.map((split) => {
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyText: {
-    color: Colors.muted,
+    color: '#555',
     fontFamily: 'SpaceGrotesk-Medium',
     fontSize: 16,
   },
