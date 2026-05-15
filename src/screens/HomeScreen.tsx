@@ -41,13 +41,37 @@ const HomeScreen = () => {
   );
 
   const checkFirstLaunch = async () => {
-    const name = await getData(StorageKeys.MY_NAME);
-    if (!name) {
-      Alert.alert(
-        'Welcome to SPLITR! ⚡',
-        'Before you start, please set your name and UPI ID in Settings.',
-        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
-      );
+    const myName = await getData(StorageKeys.MY_NAME);
+    const myUPI = await getData(StorageKeys.MY_UPI);
+
+    // Validate name
+    if (!myName || /^[0-9]+$/.test(myName)) {
+      if (Platform.OS === 'web') {
+        alert('Setup Required: Please go to Settings and enter your real name and UPI ID first.');
+        navigation.navigate('Profile');
+      } else {
+        Alert.alert(
+          'Setup Required',
+          'Please go to Settings and enter your real name and UPI ID first.',
+          [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+        );
+      }
+      return;
+    }
+
+    // Validate UPI
+    if (!myUPI || !myUPI.includes('@')) {
+      if (Platform.OS === 'web') {
+        alert('UPI ID Missing: Please add your UPI ID in Settings before asking money.');
+        navigation.navigate('Profile');
+      } else {
+        Alert.alert(
+          'UPI ID Missing',
+          'Please add your UPI ID in Settings before asking money.',
+          [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+        );
+      }
+      return;
     }
   };
 

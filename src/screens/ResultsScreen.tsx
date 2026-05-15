@@ -55,21 +55,31 @@ const ResultsScreen = () => {
 
     // Validate name
     if (!myName || /^[0-9]+$/.test(myName)) {
-      Alert.alert(
-        'Setup Required',
-        'Please go to Settings and enter your real name and UPI ID first.',
-        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
-      );
+      if (Platform.OS === 'web') {
+        alert('Setup Required: Please go to Settings and enter your real name and UPI ID first.');
+        navigation.navigate('Profile');
+      } else {
+        Alert.alert(
+          'Setup Required',
+          'Please go to Settings and enter your real name and UPI ID first.',
+          [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+        );
+      }
       return;
     }
 
     // Validate UPI
     if (!myUPI || !myUPI.includes('@')) {
-      Alert.alert(
-        'UPI ID Missing',
-        'Please add your UPI ID in Settings before asking money.',
-        [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
-      );
+      if (Platform.OS === 'web') {
+        alert('UPI ID Missing: Please add your UPI ID in Settings before asking money.');
+        navigation.navigate('Profile');
+      } else {
+        Alert.alert(
+          'UPI ID Missing',
+          'Please add your UPI ID in Settings before asking money.',
+          [{ text: 'Go to Settings', onPress: () => navigation.navigate('Profile') }]
+        );
+      }
       return;
     }
 
