@@ -59,12 +59,25 @@ const SettingsScreen = () => {
   const [phone, setPhone] = useState('');
   const [notifications, setNotifications] = useState(true);
 
-  // BUG 5 Fix: Load on screen open
+  // Auto-fix and Load on screen open
   useEffect(() => {
     const loadSettings = async () => {
-      const upi = await getData(StorageKeys.MY_UPI);
-      const sName = await getData(StorageKeys.MY_NAME);
-      const sPhone = await getData(StorageKeys.MY_PHONE);
+      let upi = await getData(StorageKeys.MY_UPI);
+      let sName = await getData(StorageKeys.MY_NAME);
+      let sPhone = await getData(StorageKeys.MY_PHONE);
+
+      // AUTO-FIX: Detect if keys are swapped
+      // If UPI has no '@' and Name HAS an '@', they are swapped
+      if (upi && sName && !upi.includes('@') && sName.includes('@')) {
+        console.log('[Settings] Swapping mis-saved keys...');
+        const temp = upi;
+        upi = sName;
+        sName = temp;
+        // Save back correctly
+        await saveData(StorageKeys.MY_UPI, upi);
+        await saveData(StorageKeys.MY_NAME, sName);
+      }
+
       if (upi) setUpiId(upi);
       if (sName) setName(sName);
       if (sPhone) setPhone(sPhone);
