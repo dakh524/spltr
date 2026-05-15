@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { Bell, Zap, PlusCircle, TrendingUp, TrendingDown, DollarSign } from 'lucide-react-native';
 import { Colors } from '../constants/Colors';
@@ -143,7 +144,11 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <Zap color={Colors.neonGreen} size={28} fill={Colors.neonGreen} />
+          <Image 
+            source={require('../../assets/logo.png')} 
+            style={styles.logoImage} 
+            resizeMode="contain"
+          />
           <Text style={styles.logoText}>SPLITR</Text>
         </View>
         <TouchableOpacity style={styles.iconButton}>
@@ -310,6 +315,15 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+    marginRight: 10,
+    shadowColor: Colors.neonGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
   },
   logoText: {
     color: Colors.neonGreen,

@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   ActionSheetIOS,
+  Image,
 } from 'react-native';
 import { 
   ChevronLeft, 
@@ -309,7 +310,14 @@ const FinanceScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Finance</Text>
+        <View style={styles.titleContainer}>
+          <Image 
+            source={require('../../assets/logo.png')} 
+            style={styles.logoImage} 
+            resizeMode="contain"
+          />
+          <Text style={styles.headerTitle}>Finance</Text>
+        </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress('expense')}>
           <Plus color={Colors.background} size={16} style={{ marginRight: 4 }} />
           <Text style={styles.addBtnText}>Add</Text>
@@ -664,6 +672,8 @@ const FinanceScreen = () => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#080810' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
+  titleContainer: { flexDirection: 'row', alignItems: 'center' },
+  logoImage: { width: 28, height: 28, marginRight: 10 },
   headerTitle: { color: Colors.white, fontSize: 24, fontFamily: 'SpaceGrotesk-Bold' },
   addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.neonGreen, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   addBtnText: { color: Colors.background, fontSize: 14, fontFamily: 'SpaceGrotesk-Bold' },
