@@ -66,13 +66,13 @@ const SettingsScreen = () => {
       let sName = await getData(StorageKeys.MY_NAME);
       let sPhone = await getData(StorageKeys.MY_PHONE);
 
-      // AUTO-FIX: Detect if keys are swapped
-      // If UPI has no '@' and Name HAS an '@', they are swapped
-      if (upi && sName && !upi.includes('@') && sName.includes('@')) {
-        console.log('[Settings] Swapping mis-saved keys...');
+      // AUTO-FIX: Aggressive detect if keys are swapped
+      // If Name HAS an '@', it's almost certainly a UPI ID. Swap it.
+      if (sName && sName.includes('@')) {
+        console.log('[Settings] Detected UPI in Name field. Swapping keys...');
         const temp = upi;
         upi = sName;
-        sName = temp;
+        sName = temp || 'User'; // Fallback if temp was empty
         // Save back correctly
         await saveData(StorageKeys.MY_UPI, upi);
         await saveData(StorageKeys.MY_NAME, sName);

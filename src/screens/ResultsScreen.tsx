@@ -58,8 +58,19 @@ const ResultsScreen = () => {
   };
 
   const sendWhatsAppRequest = async (friend: any) => {
-    const myUPI = await getData(StorageKeys.MY_UPI);
-    const myName = await getData(StorageKeys.MY_NAME) || 'Me';
+    let myUPI = await getData(StorageKeys.MY_UPI);
+    let myName = await getData(StorageKeys.MY_NAME) || 'Me';
+    
+    // AUTO-FIX: If Name HAS an '@', it's almost certainly a UPI ID. Swap it.
+    if (myName && myName.includes('@')) {
+      console.log('[Results] Detected UPI in Name field. Swapping keys...');
+      const temp = myUPI;
+      myUPI = myName;
+      myName = temp || 'User';
+      // Save back correctly
+      await saveData(StorageKeys.MY_UPI, myUPI);
+      await saveData(StorageKeys.MY_NAME, myName);
+    }
     
     console.log('[WhatsAppShare] Storage Data - myUPI:', myUPI, 'myName:', myName);
 
