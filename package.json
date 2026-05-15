@@ -40,7 +40,7 @@
     "react-native-share": "^12.3.1",
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
-    "victory-native": "^41.20.3"
+    "victory-native": "^36.6.11"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

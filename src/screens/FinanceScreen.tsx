@@ -39,7 +39,8 @@ import {
   VictoryLine, 
   VictoryArea,
   VictoryTooltip,
-  VictoryVoronoiContainer
+  VictoryVoronoiContainer,
+  VictoryTheme
 } from 'victory-native';
 import { Colors } from '../constants/Colors';
 import { getData, saveData } from '../utils/storage';
@@ -289,7 +290,7 @@ const FinanceScreen = () => {
             />
             <VictoryAxis
               dependentAxis
-              tickFormat={(x) => `₹${x / 1000}k`}
+              tickFormat={(x: number) => `₹${x / 1000}k`}
               style={{
                 axis: { stroke: '#555' },
                 tickLabels: { fill: '#888', fontSize: 10, fontFamily: 'SpaceGrotesk-Regular' },
