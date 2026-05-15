@@ -88,22 +88,28 @@ const ResultsScreen = () => {
       myName
     );
 
-    let whatsappURL = `whatsapp://send?text=${encodeURIComponent(message)}`;
-    
-    if (friend.phone) {
-      // Direct message if phone is available
-      whatsappURL = `whatsapp://send?phone=91${friend.phone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(message)}`;
-    }
-
     try {
-      const supported = await Linking.canOpenURL(whatsappURL);
+      // Use universal https://wa.me link for better compatibility
+      const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+      const encodedMessage = encodeURIComponent(message);
+      
+      const waURL = phoneNumber 
+        ? `https://wa.me/91${phoneNumber}?text=${encodedMessage}`
+        : `https://wa.me/?text=${encodedMessage}`;
+
+      const supported = await Linking.canOpenURL(waURL);
+      
       if (supported) {
-        await Linking.openURL(whatsappURL);
+        await Linking.openURL(waURL);
       } else {
-        await Share.share({ message });
+        // Fallback to native share sheet
+        await Share.share({ 
+          message,
+          title: 'Split Request' 
+        });
       }
     } catch (error) {
-      console.error(error);
+      console.error('[WhatsAppShare] Error:', error);
       await Share.share({ message });
     }
   };
