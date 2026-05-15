@@ -25,6 +25,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as financeStorage from '../utils/financeStorage';
 import { format } from 'date-fns';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -76,6 +77,27 @@ const HomeScreen = () => {
       return;
     }
   };
+
+  useEffect(() => {
+    const checkFirstLaunch = async () => {
+      const isFirst = await AsyncStorage.getItem('@splitr_first_launch');
+      if (isFirst === null) {
+        Alert.alert(
+          'Welcome to SPLITR! 🚀',
+          'We are excited to have you! To get started, please go to Settings and fill in your details (Name & UPI ID) so your friends can pay you back.',
+          [
+            { 
+              text: 'Go to Settings', 
+              onPress: () => navigation.navigate('Settings') 
+            },
+            { text: 'Later', style: 'cancel' }
+          ]
+        );
+        await AsyncStorage.setItem('@splitr_first_launch', 'done');
+      }
+    };
+    checkFirstLaunch();
+  }, []);
 
   const loadData = async () => {
     const data = await getSplits();
