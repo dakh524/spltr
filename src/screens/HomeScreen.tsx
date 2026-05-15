@@ -14,6 +14,7 @@ import { Colors } from '../constants/Colors';
 import SplitCard from '../components/SplitCard';
 import AdBanner from '../components/AdBanner';
 import FriendAvatar from '../components/FriendAvatar';
+import { VictoryLine } from 'victory-native';
 import { Split } from '../types';
 import { getSplits, getData } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
@@ -26,6 +27,7 @@ const HomeScreen = () => {
   const [splits, setSplits] = useState<Split[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({ total: 0, amount: 0, pending: 0 });
+  const [financeMetrics, setFinanceMetrics] = useState({ earned: 0, spent: 0, trend: [] as any[] });
   const [pendingCount, setPendingCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation<any>();
@@ -64,6 +66,32 @@ const HomeScreen = () => {
       pending: pendingAmount
     });
     setPendingCount(pCount);
+
+    // Load Finance Data for Sparkline
+    const txData = await getData(StorageKeys.TRANSACTIONS);
+    if (txData) {
+      const now = new Date();
+      const last6 = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const m = d.getMonth();
+        const y = d.getFullYear();
+        const monthTx = txData.filter((t: any) => {
+          const td = new Date(t.date);
+          return td.getMonth() === m && td.getFullYear() === y;
+        });
+        const income = monthTx.filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        const expense = monthTx.filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        last6.push({ x: i, y: income - expense });
+      }
+      const currentMonthTx = txData.filter((t: any) => {
+        const td = new Date(t.date);
+        return td.getMonth() === now.getMonth() && td.getFullYear() === now.getFullYear();
+      });
+      const earned = currentMonthTx.filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + curr.amount, 0);
+      const spent = currentMonthTx.filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + curr.amount, 0);
+      setFinanceMetrics({ earned, spent, trend: last6 });
+    }
   };
 
   // BUG 2 Fix: onRefresh now calls loadData
@@ -120,6 +148,31 @@ const HomeScreen = () => {
             value={`₹${metrics.pending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} 
           />
         </View>
+
+        <TouchableOpacity 
+          style={styles.financeCard} 
+          onPress={() => navigation.navigate('Finance')}
+        >
+          <View style={styles.financeInfo}>
+            <Text style={styles.financeLabel}>Finance Summary</Text>
+            <Text style={styles.financeValue}>
+              ₹{(financeMetrics.earned - financeMetrics.spent).toLocaleString()} 
+              <Text style={styles.financeSub}> saved</Text>
+            </Text>
+          </View>
+          <View style={styles.sparkline}>
+            <VictoryLine
+              data={financeMetrics.trend.length > 0 ? financeMetrics.trend : [{x:0, y:0}, {x:1, y:0}, {x:2, y:0}]}
+              width={120}
+              height={40}
+              padding={0}
+              style={{
+                data: { stroke: Colors.neonGreen, strokeWidth: 3 }
+              }}
+              interpolation="natural"
+            />
+          </View>
+        </TouchableOpacity>
 
         {friends.length > 0 && (
           <View style={styles.friendsSection}>
@@ -342,6 +395,41 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+  },
+  financeCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 24,
+  },
+  financeInfo: {
+    flex: 1,
+  },
+  financeLabel: {
+    color: Colors.muted,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Medium',
+    marginBottom: 4,
+  },
+  financeValue: {
+    color: Colors.white,
+    fontSize: 20,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  financeSub: {
+    color: Colors.muted,
+    fontSize: 14,
+    fontFamily: 'SpaceGrotesk-Regular',
+  },
+  sparkline: {
+    width: 120,
+    height: 40,
+    justifyContent: 'center',
   },
 });
 

@@ -7,4 +7,5 @@ export const StorageKeys = {
   PRO: '@splitr_pro',
   CURRENCY: '@splitr_currency',
   SPLIT_TYPE: '@splitr_splittype',
+  TRANSACTIONS: '@splitr_transactions',
 };

@@ -102,9 +102,19 @@ const ResultsScreen = () => {
       currentSplit.name
     );
 
+    // CRITICAL FIX: On Web, open WhatsApp IMMEDIATELY to avoid popup blockers
+    if (Platform.OS === 'web') {
+      const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+      const waURL = phoneNumber 
+        ? `https://wa.me/91${phoneNumber}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(waURL, '_blank');
+      return;
+    }
+
     try {
       // 1. Generate QR Code Image (Only on Native - FileSystem/Sharing don't work the same on Web)
-      if (qrRef.current && Platform.OS !== 'web') {
+      if (qrRef.current) {
         qrRef.current.toDataURL(async (base64Data: string) => {
           try {
             const path = FileSystem.cacheDirectory + 'splitr_qr.png';

@@ -1,4 +1,14 @@
-export type Category = 'food' | 'travel' | 'home' | 'entertainment' | 'other';
+export type Category = 'food' | 'travel' | 'home' | 'entertainment' | 'shopping' | 'other';
+export type TransactionType = 'income' | 'expense';
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  category: Category;
+  note: string;
+  date: string;
+}
 
 export interface Friend {
   id: string;

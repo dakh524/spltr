@@ -1,9 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, PlusCircle, List, User } from 'lucide-react-native';
+import { Home, PlusCircle, List, User, BarChart2 } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import NewSplitScreen from '../screens/NewSplitScreen';
 import HistoryScreen from '../screens/HistoryScreen';
+import FinanceScreen from '../screens/FinanceScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import { Colors } from '../constants/Colors';
 import { Platform } from 'react-native';
@@ -50,6 +51,13 @@ const BottomTabNavigator = () => {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ color, size }) => <List color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Finance"
+        component={FinanceScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <BarChart2 color={color} size={size} />,
         }}
       />
       <Tab.Screen
