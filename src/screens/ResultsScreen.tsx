@@ -23,7 +23,7 @@ import { StorageKeys } from '../constants/StorageKeys';
 import { formatWhatsAppMessage } from '../utils/shareMessage';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
-import { cacheDirectory, writeAsStringAsync, EncodingType } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ResultsScreen = () => {
@@ -103,28 +103,24 @@ const ResultsScreen = () => {
     );
 
     try {
-      // 1. Generate QR Code Image
+      // 1. Generate QR Code Image (Only on Native - FileSystem/Sharing don't work the same on Web)
       if (qrRef.current && Platform.OS !== 'web') {
         qrRef.current.toDataURL(async (base64Data: string) => {
           try {
-            const path = cacheDirectory + 'splitr_qr.png';
-            await writeAsStringAsync(path, base64Data, {
-              encoding: EncodingType.Base64
+            const path = FileSystem.cacheDirectory + 'splitr_qr.png';
+            await FileSystem.writeAsStringAsync(path, base64Data, {
+              encoding: FileSystem.EncodingType.Base64
             });
 
             // 2. Share Image
-            await Sharing.shareAsync(path, {
+            // We don't await this so it doesn't block the WhatsApp opening
+            Sharing.shareAsync(path, {
               mimeType: 'image/png',
               dialogTitle: 'Send Payment Request'
             });
 
             // 3. Open WhatsApp for the text part
-            const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
-            const waURL = phoneNumber 
-              ? `https://wa.me/91${phoneNumber}?text=${encodeURIComponent(message)}`
-              : `https://wa.me/?text=${encodeURIComponent(message)}`;
-            
-            await Linking.openURL(waURL);
+            await shareTextOnly(message, friend);
           } catch (e) {
             console.error('QR Share Error:', e);
             // Fallback to text only
