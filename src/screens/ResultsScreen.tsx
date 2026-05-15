@@ -23,7 +23,7 @@ import { StorageKeys } from '../constants/StorageKeys';
 import { formatWhatsAppMessage } from '../utils/shareMessage';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import { cacheDirectory, writeAsStringAsync, EncodingType } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ResultsScreen = () => {
@@ -73,21 +73,31 @@ const ResultsScreen = () => {
   };
 
   const sendWhatsAppRequest = async (friend: any) => {
-    const upiFromStorage = (await AsyncStorage.getItem(StorageKeys.MY_UPI))?.trim() || '';
-    const nameFromStorage = (await AsyncStorage.getItem(StorageKeys.MY_NAME))?.trim() || '';
+    // STEP 4: Load fresh and strip quotes
+    const rawName = await AsyncStorage.getItem(StorageKeys.MY_NAME);
+    const rawUPI = await AsyncStorage.getItem(StorageKeys.MY_UPI);
     
-    console.log('DEBUG myUPI:', upiFromStorage);
-    console.log('DEBUG myName:', nameFromStorage);
+    const myName = rawName?.replace(/"/g, '').trim() || '';
+    const myUPI = rawUPI?.replace(/"/g, '').trim() || '';
+    
+    console.log('DEBUG myUPI:', myUPI);
+    console.log('DEBUG myName:', myName);
 
-    if (!upiFromStorage) {
+    // Validate Name (prevent phone number as name)
+    if (!myName || /^[0-9]{10}$/.test(myName.replace(/\s/g, ''))) {
+      Alert.alert('Fix Required', 'Please go to Settings and enter your actual name correctly (not your phone number).');
+      return;
+    }
+
+    if (!myUPI) {
       Alert.alert('Setup Required', 'Please set your UPI ID in Settings first.');
       return;
     }
 
     const message = formatWhatsAppMessage(
       friend.name,
-      nameFromStorage || 'Me',
-      upiFromStorage,
+      myName,
+      myUPI,
       friend.amount,
       currentSplit.name
     );
@@ -97,9 +107,9 @@ const ResultsScreen = () => {
       if (qrRef.current && Platform.OS !== 'web') {
         qrRef.current.toDataURL(async (base64Data: string) => {
           try {
-            const path = FileSystem.cacheDirectory + 'splitr_qr.png';
-            await FileSystem.writeAsStringAsync(path, base64Data, {
-              encoding: FileSystem.EncodingType.Base64
+            const path = cacheDirectory + 'splitr_qr.png';
+            await writeAsStringAsync(path, base64Data, {
+              encoding: EncodingType.Base64
             });
 
             // 2. Share Image

@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
 import { Modal, Alert } from 'react-native';
 import { AvatarColors } from '../constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingRow = ({
   icon: Icon,
@@ -56,9 +57,9 @@ const SettingRow = ({
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
-  const [upiId, setUpiId] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [myUPI, setMyUPI] = useState('');
+  const [myName, setMyName] = useState('');
+  const [myPhone, setMyPhone] = useState('');
   const [notifications, setNotifications] = useState(true);
   const [friends, setFriends] = useState<any[]>([]);
   const [showFriendModal, setShowFriendModal] = useState(false);
@@ -69,27 +70,32 @@ const SettingsScreen = () => {
   const [fUPI, setFUPI] = useState('');
   const [fPhone, setFPhone] = useState('');
 
-  // Auto-fix and Load on screen open
+  // STEP 5: One-time data correction for swapped values
+  useEffect(() => {
+    const fixCorruptedData = async () => {
+      const name = await AsyncStorage.getItem(StorageKeys.MY_NAME);
+      // if name looks like a phone number, it means fields were swapped or corrupted
+      if (name && /^[0-9]{10}$/.test(name.replace(/"/g, '').trim())) {
+        console.log('[Settings] Corrupted data detected. Wiping profile keys...');
+        await AsyncStorage.multiRemove([StorageKeys.MY_NAME, StorageKeys.MY_UPI, StorageKeys.MY_PHONE]);
+        setMyName('');
+        setMyUPI('');
+        setMyPhone('');
+      }
+    };
+    fixCorruptedData();
+  }, []);
+
+  // STEP 1: Load and strip quotes
   useEffect(() => {
     const loadSettings = async () => {
-      const upi = await getData(StorageKeys.MY_UPI);
-      const sName = await getData(StorageKeys.MY_NAME);
-      const sPhone = await getData(StorageKeys.MY_PHONE);
+      const name = await AsyncStorage.getItem(StorageKeys.MY_NAME);
+      const upi = await AsyncStorage.getItem(StorageKeys.MY_UPI);
+      const phone = await AsyncStorage.getItem(StorageKeys.MY_PHONE);
 
-      // Data correction logic
-      if (sName && sName.includes('@')) {
-        const tempUPI = sName;
-        const tempName = upi || '';
-        await saveData(StorageKeys.MY_UPI, tempUPI);
-        await saveData(StorageKeys.MY_NAME, tempName);
-        setUpiId(tempUPI);
-        setName(tempName);
-      } else {
-        setUpiId(upi || '');
-        setName(sName || '');
-      }
-
-      if (sPhone) setPhone(sPhone);
+      setMyName(name?.replace(/"/g, '').trim() || '');
+      setMyUPI(upi?.replace(/"/g, '').trim() || '');
+      setMyPhone(phone?.replace(/"/g, '').trim() || '');
 
       // Load Friends
       const savedFriends = await getData(StorageKeys.FRIENDS);
@@ -98,22 +104,20 @@ const SettingsScreen = () => {
     loadSettings();
   }, []);
 
-  // BUG 5 Fix: Save immediately on every change
-  const handleSaveUPI = async (value: string) => {
-    const trimmed = value.trim();
-    setUpiId(trimmed);
-    await saveData(StorageKeys.MY_UPI, trimmed);
+  // STEP 2: Save function with EXACT keys and trimming
+  const handleSaveName = async (value: string) => {
+    setMyName(value);
+    await AsyncStorage.setItem(StorageKeys.MY_NAME, value.trim());
   };
 
-  const handleSaveName = async (value: string) => {
-    const trimmed = value.trim();
-    setName(trimmed);
-    await saveData(StorageKeys.MY_NAME, trimmed);
+  const handleSaveUPI = async (value: string) => {
+    setMyUPI(value);
+    await AsyncStorage.setItem(StorageKeys.MY_UPI, value.trim());
   };
 
   const handleSavePhone = async (value: string) => {
-    setPhone(value);
-    await saveData(StorageKeys.MY_PHONE, value);
+    setMyPhone(value);
+    await AsyncStorage.setItem(StorageKeys.MY_PHONE, value.trim());
   };
 
   // Friends Management Logic
@@ -206,7 +210,7 @@ const SettingsScreen = () => {
             icon={CreditCard}
             label="UPI ID"
             isInput
-            inputValue={upiId}
+            inputValue={myUPI}
             onInputChange={handleSaveUPI}
             placeholder="example@upi"
           />
@@ -214,7 +218,7 @@ const SettingsScreen = () => {
             icon={User}
             label="Profile Name"
             isInput
-            inputValue={name}
+            inputValue={myName}
             onInputChange={handleSaveName}
             placeholder="Your Name"
           />
@@ -222,9 +226,9 @@ const SettingsScreen = () => {
             icon={Shield}
             label="Phone Number"
             isInput
-            inputValue={phone}
+            inputValue={myPhone}
             onInputChange={handleSavePhone}
-            placeholder="+91 XXXXX XXXXX"
+            placeholder="10 digit number"
           />
         </View>
 
