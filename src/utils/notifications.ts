@@ -10,6 +10,18 @@ const QUOTES = [
   "Opportunity doesn't knock, it presents itself when you beat down the door. 🔨",
   "Wealth is the ability to fully experience life. 🌟",
   "Today is a good day to make some 0s behind your 1s. 💸",
+  "Stop chasing the money and start chasing the freedom. 🦅",
+  "Consistency is the only thing that beats luck. Keep grinding! ⛓️",
+  "Your future self is thanking you for the work you're doing today. 🏆",
+  "Success is not owned, it is leased. And rent is due every day. 📅",
+  "Make your money work for you, so you don't have to work for it. 🏦",
+  "The best way to predict the future is to create it. 🛠️",
+  "A year from now, you'll wish you started today. ⏰",
+  "Don't talk, just act. Don't say, just show. Don't promise, just prove. 🦾",
+  "The only limit to your impact is your imagination and commitment. 🌌",
+  "Winners focus on winning. Losers focus on winners. Stay focused! 🎯",
+  "Comfort is the enemy of progress. Get uncomfortable today. 🧗",
+  "Dream big, work hard, stay humble, and stack that paper. 📚",
 ];
 
 export async function requestPermissions() {
