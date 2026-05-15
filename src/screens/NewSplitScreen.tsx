@@ -254,43 +254,57 @@ const NewSplitScreen = () => {
 
       <Modal visible={showAddFriend} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Friend</Text>
-              <TouchableOpacity onPress={() => setShowAddFriend(false)}>
-                <X color={Colors.white} size={24} />
-              </TouchableOpacity>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%' }}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Friend</Text>
+                <TouchableOpacity onPress={() => setShowAddFriend(false)} style={styles.modalClose}>
+                  <X color={Colors.white} size={24} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Enter name"
+                  placeholderTextColor={Colors.muted}
+                  value={newFriendName}
+                  onChangeText={setNewFriendName}
+                  autoFocus
+                />
+
+                <Text style={styles.inputLabel}>WhatsApp Number (for direct chat)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="10 digit mobile number"
+                  placeholderTextColor={Colors.muted}
+                  value={newFriendPhone}
+                  onChangeText={setNewFriendPhone}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
+
+                <Text style={styles.inputLabel}>Friend's UPI ID (optional)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="friend@upi"
+                  placeholderTextColor={Colors.muted}
+                  value={newFriendUPI}
+                  onChangeText={setNewFriendUPI}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <TouchableOpacity style={styles.modalButton} onPress={handleAddFriend}>
+                  <Text style={styles.modalButtonText}>Add to Split</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Friend's Name"
-              placeholderTextColor={Colors.muted}
-              value={newFriendName}
-              onChangeText={setNewFriendName}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Phone Number"
-              placeholderTextColor={Colors.muted}
-              value={newFriendPhone}
-              onChangeText={setNewFriendPhone}
-              keyboardType="phone-pad"
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="UPI ID (optional)"
-              placeholderTextColor={Colors.muted}
-              value={newFriendUPI}
-              onChangeText={setNewFriendUPI}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <TouchableOpacity style={styles.modalButton} onPress={handleAddFriend}>
-              <Text style={styles.modalButtonText}>Save Friend</Text>
-            </TouchableOpacity>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -420,12 +434,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  modalClose: {
+    padding: 4,
   },
   modalTitle: {
     color: Colors.white,
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'SpaceGrotesk-Bold',
+  },
+  modalBody: {
+    marginTop: 10,
+  },
+  inputLabel: {
+    color: Colors.muted,
+    fontSize: 12,
+    fontFamily: 'SpaceGrotesk-Bold',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginLeft: 4,
   },
   modalInput: {
     backgroundColor: Colors.background,
@@ -435,17 +463,22 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontFamily: 'SpaceGrotesk-Medium',
     fontSize: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   modalButton: {
     backgroundColor: Colors.neonGreen,
-    height: 56,
+    height: 60,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
+    shadowColor: Colors.neonGreen,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   modalButtonText: {
     color: Colors.background,
