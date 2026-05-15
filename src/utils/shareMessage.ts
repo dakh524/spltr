@@ -1,19 +1,16 @@
-import { makeUPILink } from './upiLink';
-
-export const formatWhatsAppMessage = (
+export function formatWhatsAppMessage(
   friendName: string,
-  amount: number,
-  splitName: string,
+  myName: string,
   myUPI: string,
-  myName: string
-) => {
-  const upiLink = makeUPILink(myUPI, myName, amount, splitName);
-  
-  // BUG 2 Fix: WhatsApp only makes upi:// links tappable when isolated with blank lines
-  return `Hey ${friendName}! 👋\n` +
-         `${myName} paid for *${splitName}* 🧾\n` +
-         `Your share: *₹${amount.toFixed(2)}*\n\n` +
-         `Tap to pay instantly 👇\n\n` +
-         `${upiLink}\n\n` +
-         `_Sent via SPLITR ⚡_`;
-};
+  amount: number,
+  splitName: string
+): string {
+  return (
+    `Hey ${friendName}! 👋\n` +
+    `*${myName}* paid for *${splitName}* 🧾\n` +
+    `Your share: *₹${amount.toFixed(2)}*\n\n` +
+    `Pay me on any UPI app 👇\n` +
+    `*UPI ID: ${myUPI}*\n\n` +
+    `_Sent via SPLITR ⚡_`
+  );
+}

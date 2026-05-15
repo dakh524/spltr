@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { updateSplit, getData, saveData } from '../utils/storage';
 import { StorageKeys } from '../constants/StorageKeys';
-import { makeUPILink } from '../utils/upiLink';
 import { formatWhatsAppMessage } from '../utils/shareMessage';
+import QRCode from 'react-native-qrcode-svg';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ResultsScreen = () => {
   const navigation = useNavigation<any>();
@@ -31,6 +34,17 @@ const ResultsScreen = () => {
   const { split } = route.params;
   
   const [currentSplit, setCurrentSplit] = useState(split);
+  const qrRef = useRef<any>(null);
+  const [myUPI, setMyUPI] = useState('');
+  
+  useEffect(() => {
+    loadMyUPI();
+  }, []);
+
+  const loadMyUPI = async () => {
+    const upi = await AsyncStorage.getItem(StorageKeys.MY_UPI);
+    if (upi) setMyUPI(upi.trim());
+  };
 
   if (!split) {
     return (
@@ -59,66 +73,93 @@ const ResultsScreen = () => {
   };
 
   const sendWhatsAppRequest = async (friend: any) => {
-    let myUPI = await getData(StorageKeys.MY_UPI);
-    let myName = await getData(StorageKeys.MY_NAME) || 'Me';
+    const upiFromStorage = (await AsyncStorage.getItem(StorageKeys.MY_UPI))?.trim() || '';
+    const nameFromStorage = (await AsyncStorage.getItem(StorageKeys.MY_NAME))?.trim() || '';
     
-    // AUTO-FIX: If Name HAS an '@', it's almost certainly a UPI ID. Swap it.
-    if (myName && myName.includes('@')) {
-      console.log('[Results] Detected UPI in Name field. Swapping keys...');
-      const temp = myUPI;
-      myUPI = myName;
-      myName = temp || 'User';
-      // Save back correctly
-      await saveData(StorageKeys.MY_UPI, myUPI);
-      await saveData(StorageKeys.MY_NAME, myName);
-    }
-    
-    console.log('[WhatsAppShare] Storage Data - myUPI:', myUPI, 'myName:', myName);
+    console.log('DEBUG myUPI:', upiFromStorage);
+    console.log('DEBUG myName:', nameFromStorage);
 
-    if (!myUPI) {
-      Alert.alert('Error', 'Set your UPI ID in settings first');
+    if (!upiFromStorage) {
+      Alert.alert('Setup Required', 'Please set your UPI ID in Settings first.');
       return;
     }
 
-    // BUG 1 & 2 Fix: Use centralized formatWhatsAppMessage utility
     const message = formatWhatsAppMessage(
       friend.name,
+      nameFromStorage || 'Me',
+      upiFromStorage,
       friend.amount,
-      currentSplit.name,
-      myUPI,
-      myName
+      currentSplit.name
     );
 
     try {
-      // Use universal https://wa.me link for better compatibility
-      const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
-      const encodedMessage = encodeURIComponent(message);
-      
-      const waURL = phoneNumber 
-        ? `https://wa.me/91${phoneNumber}?text=${encodedMessage}`
-        : `https://wa.me/?text=${encodedMessage}`;
+      // 1. Generate QR Code Image
+      if (qrRef.current && Platform.OS !== 'web') {
+        qrRef.current.toDataURL(async (base64Data: string) => {
+          try {
+            const path = FileSystem.cacheDirectory + 'splitr_qr.png';
+            await FileSystem.writeAsStringAsync(path, base64Data, {
+              encoding: FileSystem.EncodingType.Base64
+            });
 
-      // On Web, window.open is more reliable for direct links
-      if (Platform.OS === 'web') {
-        window.open(waURL, '_blank');
-      } else {
-        // Open directly without canOpenURL check (more reliable)
-        await Linking.openURL(waURL).catch(async () => {
-          // Fallback to native share sheet if openURL fails
-          await Share.share({ 
-            message,
-            title: 'Split Request' 
-          });
+            // 2. Share Image
+            await Sharing.shareAsync(path, {
+              mimeType: 'image/png',
+              dialogTitle: 'Send Payment Request'
+            });
+
+            // 3. Open WhatsApp for the text part
+            const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+            const waURL = phoneNumber 
+              ? `https://wa.me/91${phoneNumber}?text=${encodeURIComponent(message)}`
+              : `https://wa.me/?text=${encodeURIComponent(message)}`;
+            
+            await Linking.openURL(waURL);
+          } catch (e) {
+            console.error('QR Share Error:', e);
+            // Fallback to text only
+            await shareTextOnly(message, friend);
+          }
         });
+      } else {
+        await shareTextOnly(message, friend);
       }
     } catch (error) {
       console.error('[WhatsAppShare] Error:', error);
-      await Share.share({ message });
+      await shareTextOnly(message, friend);
     }
   };
 
+  const shareTextOnly = async (message: string, friend: any) => {
+    const phoneNumber = friend.phone ? friend.phone.replace(/[^0-9]/g, '') : '';
+    const encodedMessage = encodeURIComponent(message);
+    
+    const waURL = phoneNumber 
+      ? `https://wa.me/91${phoneNumber}?text=${encodedMessage}`
+      : `https://wa.me/?text=${encodedMessage}`;
+
+    if (Platform.OS === 'web') {
+      window.open(waURL, '_blank');
+    } else {
+      await Linking.openURL(waURL).catch(async () => {
+        await Share.share({ message });
+      });
+    }
+  };
+
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={{ position: 'absolute', opacity: 0, left: -1000 }}>
+        {myUPI ? (
+          <QRCode
+            value={`upi://pay?pa=${myUPI}&cu=INR`}
+            size={200}
+            getRef={(ref) => (qrRef.current = ref)}
+          />
+        ) : null}
+      </View>
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft color={Colors.white} size={24} />

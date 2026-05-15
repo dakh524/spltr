@@ -72,24 +72,23 @@ const SettingsScreen = () => {
   // Auto-fix and Load on screen open
   useEffect(() => {
     const loadSettings = async () => {
-      let upi = await getData(StorageKeys.MY_UPI);
-      let sName = await getData(StorageKeys.MY_NAME);
-      let sPhone = await getData(StorageKeys.MY_PHONE);
+      const upi = await getData(StorageKeys.MY_UPI);
+      const sName = await getData(StorageKeys.MY_NAME);
+      const sPhone = await getData(StorageKeys.MY_PHONE);
 
-      // AUTO-FIX: Aggressive detect if keys are swapped
-      // If Name HAS an '@', it's almost certainly a UPI ID. Swap it.
+      // Data correction logic
       if (sName && sName.includes('@')) {
-        console.log('[Settings] Detected UPI in Name field. Swapping keys...');
-        const temp = upi;
-        upi = sName;
-        sName = temp || 'User'; // Fallback if temp was empty
-        // Save back correctly
-        await saveData(StorageKeys.MY_UPI, upi);
-        await saveData(StorageKeys.MY_NAME, sName);
+        const tempUPI = sName;
+        const tempName = upi || '';
+        await saveData(StorageKeys.MY_UPI, tempUPI);
+        await saveData(StorageKeys.MY_NAME, tempName);
+        setUpiId(tempUPI);
+        setName(tempName);
+      } else {
+        setUpiId(upi || '');
+        setName(sName || '');
       }
 
-      if (upi) setUpiId(upi);
-      if (sName) setName(sName);
       if (sPhone) setPhone(sPhone);
 
       // Load Friends
@@ -101,13 +100,15 @@ const SettingsScreen = () => {
 
   // BUG 5 Fix: Save immediately on every change
   const handleSaveUPI = async (value: string) => {
-    setUpiId(value);
-    await saveData(StorageKeys.MY_UPI, value);
+    const trimmed = value.trim();
+    setUpiId(trimmed);
+    await saveData(StorageKeys.MY_UPI, trimmed);
   };
 
   const handleSaveName = async (value: string) => {
-    setName(value);
-    await saveData(StorageKeys.MY_NAME, value);
+    const trimmed = value.trim();
+    setName(trimmed);
+    await saveData(StorageKeys.MY_NAME, trimmed);
   };
 
   const handleSavePhone = async (value: string) => {
