@@ -89,13 +89,13 @@ const SettingsScreen = () => {
   // STEP 1: Load and strip quotes
   useEffect(() => {
     const loadSettings = async () => {
-      const name = await AsyncStorage.getItem(StorageKeys.MY_NAME);
-      const upi = await AsyncStorage.getItem(StorageKeys.MY_UPI);
-      const phone = await AsyncStorage.getItem(StorageKeys.MY_PHONE);
+      const name = await getData(StorageKeys.MY_NAME);
+      const upi = await getData(StorageKeys.MY_UPI);
+      const phone = await getData(StorageKeys.MY_PHONE);
 
-      setMyName(name?.replace(/"/g, '').trim() || '');
-      setMyUPI(upi?.replace(/"/g, '').trim() || '');
-      setMyPhone(phone?.replace(/"/g, '').trim() || '');
+      setMyName(name || '');
+      setMyUPI(upi || '');
+      setMyPhone(phone || '');
 
       // Load Friends
       const savedFriends = await getData(StorageKeys.FRIENDS);
@@ -107,17 +107,41 @@ const SettingsScreen = () => {
   // STEP 2: Save function with EXACT keys and trimming
   const handleSaveName = async (value: string) => {
     setMyName(value);
-    await AsyncStorage.setItem(StorageKeys.MY_NAME, value.trim());
+    await saveData(StorageKeys.MY_NAME, value.trim());
   };
 
   const handleSaveUPI = async (value: string) => {
     setMyUPI(value);
-    await AsyncStorage.setItem(StorageKeys.MY_UPI, value.trim());
+    await saveData(StorageKeys.MY_UPI, value.trim());
   };
 
   const handleSavePhone = async (value: string) => {
     setMyPhone(value);
-    await AsyncStorage.setItem(StorageKeys.MY_PHONE, value.trim());
+    await saveData(StorageKeys.MY_PHONE, value.trim());
+  };
+
+  const handleResetData = async () => {
+    Alert.alert(
+      'Reset All Data',
+      'This will permanently delete all splits, transactions, and friends. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Reset Everything', 
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.clear();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Success', 'All data cleared. Restarting app...');
+            setTimeout(() => {
+              if (Platform.OS === 'web') {
+                window.location.reload();
+              }
+            }, 1000);
+          }
+        }
+      ]
+    );
   };
 
   // Friends Management Logic
@@ -312,6 +336,12 @@ const SettingsScreen = () => {
         </View>
 
         <ProBanner />
+
+        <TouchableOpacity style={styles.resetButton} onPress={handleResetData}>
+          <Trash2 color={Colors.hotPink} size={20} style={{ marginRight: 10 }} />
+          <Text style={styles.resetButtonText}>Reset All Data</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -583,6 +613,22 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: Colors.background,
+    fontSize: 16,
+    fontFamily: 'SpaceGrotesk-Bold',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 40,
+    padding: 20,
+    backgroundColor: Colors.hotPink + '10',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.hotPink + '30',
+  },
+  resetButtonText: {
+    color: Colors.hotPink,
     fontSize: 16,
     fontFamily: 'SpaceGrotesk-Bold',
   },

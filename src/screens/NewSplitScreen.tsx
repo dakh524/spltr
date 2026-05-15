@@ -141,7 +141,7 @@ const NewSplitScreen = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleGenerateLinks = async () => {
+  const handleAskFriends = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
@@ -245,9 +245,9 @@ const NewSplitScreen = () => {
         </ScrollView>
 
         <View style={styles.bottomContainer}>
-          <TouchableOpacity style={styles.generateButton} onPress={handleGenerateLinks}>
+          <TouchableOpacity style={styles.generateButton} onPress={handleAskFriends}>
             <LinkIcon color={Colors.neonGreen} size={20} style={{ marginRight: 10 }} />
-            <Text style={styles.generateButtonText}>Generate Links</Text>
+            <Text style={styles.generateButtonText}>Ask Friends →</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

@@ -94,18 +94,7 @@ const FinanceScreen = () => {
     if (saved) {
       setTransactions(saved);
     } else {
-      // Mock data for initial view
-      const mockData: Transaction[] = [
-        { id: '1', type: 'income', amount: 42000, category: 'other', note: 'Salary', date: new Date().toISOString() },
-        { id: '2', type: 'expense', amount: 4500, category: 'food', note: 'Dinner', date: new Date().toISOString() },
-        { id: '3', type: 'expense', amount: 12000, category: 'home', note: 'Rent', date: new Date().toISOString() },
-        { id: '4', type: 'expense', amount: 2000, category: 'travel', note: 'Uber', date: new Date().toISOString() },
-        { id: '5', type: 'expense', amount: 5000, category: 'shopping', note: 'Clothes', date: new Date().toISOString() },
-        { id: '6', type: 'expense', amount: 3000, category: 'entertainment', note: 'Movies', date: new Date().toISOString() },
-        { id: '7', type: 'income', amount: 5000, category: 'other', note: 'Freelance', date: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString() },
-      ];
-      setTransactions(mockData);
-      await saveData(StorageKeys.TRANSACTIONS, mockData);
+      setTransactions([]);
     }
   };
 
