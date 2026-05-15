@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Modal, Alert } from 'react-native';
 import { AvatarColors } from '../constants/Colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as NotificationsUtil from '../utils/notifications';
 
 const SettingRow = ({
   icon: Icon,
@@ -100,6 +101,10 @@ const SettingsScreen = () => {
       // Load Friends
       const savedFriends = await getData(StorageKeys.FRIENDS);
       if (savedFriends) setFriends(savedFriends);
+
+      // Load Notification Setting
+      const notifsEnabled = await getData('@splitr_notifs_enabled');
+      setNotifications(notifsEnabled !== false); // Default to true
     };
     loadSettings();
   }, []);
@@ -142,6 +147,25 @@ const SettingsScreen = () => {
         }
       ]
     );
+  };
+
+  const handleToggleNotifications = async (val: boolean) => {
+    setNotifications(val);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await saveData('@splitr_notifs_enabled', val);
+    
+    if (val) {
+      const granted = await NotificationsUtil.requestPermissions();
+      if (granted) {
+        await NotificationsUtil.scheduleMorningQuote();
+      } else {
+        setNotifications(false);
+        await saveData('@splitr_notifs_enabled', false);
+        Alert.alert('Permission Denied', 'Please enable notifications in your phone settings to receive daily quotes.');
+      }
+    } else {
+      await NotificationsUtil.cancelNotifications();
+    }
   };
 
   // Friends Management Logic
@@ -285,10 +309,7 @@ const SettingsScreen = () => {
             </View>
             <Switch
               value={notifications}
-              onValueChange={(val) => {
-                setNotifications(val);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
+              onValueChange={handleToggleNotifications}
               trackColor={{ false: Colors.border, true: Colors.neonGreen + '80' }}
               thumbColor={notifications ? Colors.neonGreen : Colors.muted}
             />
